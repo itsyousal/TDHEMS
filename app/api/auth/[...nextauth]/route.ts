@@ -56,7 +56,6 @@ const authOptions: NextAuthOptions = {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          organizationId: user.organizationId,
           roles: user.userRoles.map((ur: any) => ur.role.name),
         } as User;
       },

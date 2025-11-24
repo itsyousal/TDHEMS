@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check password
-    const passwordMatch = await bcrypt.compare(validated.password, user.passwordHash);
+    const passwordMatch = await bcrypt.compare(validated.password, user.password);
     if (!passwordMatch) {
       await logAuditAction(user.id, "read", "auth", null, {}, "failure", "Invalid password");
       throw new UnauthorizedError("Invalid email or password");
@@ -57,7 +57,5 @@ export async function POST(request: NextRequest) {
     const handled = handleApiError(error);
     const status = error instanceof UnauthorizedError ? 401 : 500;
     return NextResponse.json(handled, { status });
-  }
-}
   }
 }

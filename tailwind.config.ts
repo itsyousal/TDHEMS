@@ -3,9 +3,10 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // Include app router, components, and any src folders
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
 
   theme: {
@@ -179,15 +180,6 @@ const config: Config = {
 
   plugins: [
     require("@tailwindcss/typography"),
-  ],
-
-  safelist: [
-    // Status colors
-    { pattern: /^(bg|text|border)-(semantic-(success|warning|error|info))$/ },
-    // Grid columns
-    { pattern: /^grid-cols-(1|2|3|4|6|12)$/ },
-    // Common patterns
-    { pattern: /^(p|m|w|h)-\d+$/ },
   ],
 };
 

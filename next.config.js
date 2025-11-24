@@ -3,6 +3,7 @@
 const nextConfig = {
   reactStrictMode: true,
   compress: true,
+  poweredByHeader: false,
   
   // Image optimization
   images: {
@@ -12,8 +13,7 @@ const nextConfig = {
         hostname: "**.supabase.co",
       },
     ],
-    // Leave optimization to Next/Turbopack in development
-    unoptimized: false,
+    unoptimized: process.env.NODE_ENV === "development",
   },
 
   // Headers
@@ -48,7 +48,9 @@ const nextConfig = {
     return [];
   },
 
-  // Note: avoid custom webpack and env exposure here to remain compatible with Turbopack
+  // No custom webpack config to avoid Turbopack conflicts in Next 16 dev mode.
+
+  // (Don't expose NODE_ENV via next.config; keep env usage to .env files)
 };
 
 module.exports = nextConfig;

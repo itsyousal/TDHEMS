@@ -215,11 +215,11 @@ model Organization {
   customers         Customer[]
   batches           ProductionBatch[]
   skus              Sku[]
-  inventory         Inventory[]
   invoices          Invoice[]
   employees         Employee[]
   checklists        Checklist[]
   campaigns         MarketingCampaign[]
+  inventory         Inventory[]
   rules             Rule[]
 
   @@index([slug])
@@ -493,7 +493,7 @@ model Order {
   shipments         Shipment[]
   pickLists         PickList[]
   packJobs          PackJob[]
-  
+
   @@unique([orgId, orderNumber])
   @@index([orgId])
   @@index([locationId])
@@ -955,7 +955,7 @@ model AppealRecord {
   infractionId      String          @db.Uuid
   employeeId        String          @db.Uuid
   reason            String
-  supportingDocs    String[] @default([]) // File URLs
+  supportingDocs    String[] // File URLs
   status            String          @default("pending") // pending, approved, rejected
   decidedBy         String?
   decidedAt         DateTime?
@@ -1177,7 +1177,7 @@ model InfluencerContract {
   influencerName    String
   contactEmail      String?
   rate              Float?
-  deliverables      String[] @default([]) // JSON array
+  deliverables      String[] // JSON array
   startDate         DateTime
   endDate           DateTime?
   status            String          @default("negotiation") // negotiation, agreed, completed, cancelled
@@ -1253,7 +1253,7 @@ model CustomerInteraction {
   subject           String?
   notes             String?
   outcome           String?
-  attachments       String[] @default([]) // File URLs
+  attachments       String[] // File URLs
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 

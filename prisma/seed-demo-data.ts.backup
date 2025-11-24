@@ -1,0 +1,267 @@
+import { PrismaClient } from "@prisma/client";
+import { addDays, subDays } from "date-fns";
+
+const prisma = new PrismaClient();
+
+async function main() {
+    console.log("🚀 Seeding demo data...");
+
+    const orgSlug = "dough-house-hq";
+    const org = await prisma.organization.findUnique({
+        where: { slug: orgSlug },
+    });
+
+    if (!org) {
+        throw new Error("Organization not found. Run basic seed first.");
+    }
+
+    // Find or Create a location
+    let location = await prisma.location.findFirst({
+        where: { orgId: org.id },
+    });
+
+    if (!location) {
+        console.log("⚠️ Location not found. Creating default location...");
+        location = await prisma.location.create({
+            data: {
+                orgId: org.id,
+                name: "Main Bakery",
+                slug: "main-bakery",
+                type: "store",
+                isActive: true,
+            }
+        });
+    }
+    console.log(`✅ Location found/created: ${location.name}`);
+
+    // 1. Create Channel Sources
+    console.log("📦 Creating Channel Sources...");
+    const channels = [
+        { name: "Direct", slug: "direct", color: "#8B4513" },
+        { name: "Swiggy", slug: "swiggy", color: "#FFD700" },
+        { name: "Zomato", slug: "zomato", color: "#10B981" },
+        { name: "In-Store", slug: "in-store", color: "#3B82F6" },
+    ];
+
+    const channelMap = new Map();
+
+    for (const c of channels) {
+        const channel = await prisma.channelSource.upsert({
+            where: { slug: c.slug },
+            update: {},
+            create: {
+                name: c.name,
+                slug: c.slug,
+                isActive: true,
+            },
+        });
+        channelMap.set(c.slug, channel.id);
+    }
+
+    // 2. Create SKUs (Products)
+    console.log("🍞 Creating Products (SKUs)...");
+    const products = [
+        { name: "Sourdough Bread", sku: "BRD-SOUR-001", price: 250, cost: 80, category: "Bread" },
+        { name: "Croissant", sku: "PST-CROS-001", price: 120, cost: 40, category: "Pastry" },
+        { name: "Chocolate Cake", sku: "CAK-CHOC-001", price: 850, cost: 300, category: "Cake" },
+        { name: "Baguette", sku: "BRD-BAGU-001", price: 180, cost: 60, category: "Bread" },
+        { name: "Blueberry Muffin", sku: "PST-MUFF-001", price: 90, cost: 30, category: "Pastry" },
+    ];
+
+    const skuMap = new Map();
+
+    for (const p of products) {
+        const sku = await prisma.sku.upsert({
+            where: { orgId_code: { orgId: org.id, code: p.sku } },
+            update: {},
+            create: {
+                orgId: org.id,
+                name: p.name,
+                code: p.sku,
+                description: `Freshly baked ${p.name}`,
+                category: p.category,
+                basePrice: p.price,
+                costPrice: p.cost,
+                unit: "unit",
+                isActive: true,
+            },
+        });
+        skuMap.set(p.sku, sku.id);
+    }
+
+    // 2.5 Create Warehouse and Bins
+    console.log("🏭 Creating Warehouse and Bins...");
+    // Check if warehouse exists
+    let warehouse = await prisma.warehouse.findFirst({
+        where: { locationId: location.id }
+    });
+
+    if (!warehouse) {
+        warehouse = await prisma.warehouse.create({
+            data: {
+                locationId: location.id,
+                name: "Main Storage",
+                capacity: 10000,
+                currentUtilization: 0,
+            }
+        });
+    }
+
+    const binCodes = ["A-1-1", "A-1-2", "B-2-1", "B-2-2", "C-3-1"];
+    const bins = [];
+    for (const code of binCodes) {
+        const bin = await prisma.bin.upsert({
+            where: { warehouseId_code: { warehouseId: warehouse.id, code: code } },
+            update: {},
+            create: {
+                warehouseId: warehouse.id,
+                code: code,
+                capacity: 1000,
+                currentUtilization: 0,
+            }
+        });
+        bins.push(bin);
+    }
+
+    // 3. Create Inventory & Inventory Lots
+    console.log("🏭 Creating Inventory...");
+
+    for (const p of products) {
+        const skuId = skuMap.get(p.sku);
+        const qty = Math.floor(Math.random() * 100) + 10;
+
+        // Create Aggregate Inventory Record
+        await prisma.inventory.upsert({
+            where: {
+                locationId_skuId: {
+                    locationId: location.id,
+                    skuId: skuId,
+                }
+            },
+            update: {
+                quantity: qty,
+                availableQuantity: qty,
+            },
+            create: {
+                orgId: org.id,
+                locationId: location.id,
+                skuId: skuId,
+                quantity: qty,
+                availableQuantity: qty,
+                reservedQuantity: 0,
+                reorderLevel: 20,
+            }
+        });
+
+        // Create InventoryLot (batches of stock) linked to Bins
+        const randomBin = bins[Math.floor(Math.random() * bins.length)];
+
+        await prisma.inventoryLot.create({
+            data: {
+                skuId: skuId,
+                binId: randomBin.id, // Link to Bin
+                lotNumber: `LOT-${Math.floor(Math.random() * 10000)}`,
+                quantity: qty,
+                expiryDate: addDays(new Date(), 7),
+                manufactureDate: new Date(),
+                cost: p.cost,
+            }
+        });
+
+        // Update Bin utilization
+        await prisma.bin.update({
+            where: { id: randomBin.id },
+            data: {
+                currentUtilization: { increment: qty }
+            }
+        });
+    }
+
+    // 4. Create Orders (Past 7 days)
+    console.log("🛒 Creating Orders...");
+    const statuses = ["delivered", "delivered", "delivered", "cancelled", "pending"];
+
+    for (let i = 0; i < 50; i++) {
+        const date = subDays(new Date(), Math.floor(Math.random() * 7));
+        const channelSlug = channels[Math.floor(Math.random() * channels.length)].slug;
+        const channelId = channelMap.get(channelSlug);
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+
+        const order = await prisma.order.create({
+            data: {
+                orgId: org.id,
+                locationId: location.id,
+                orderNumber: `ORD-${Date.now()}-${i}`,
+                channelSourceId: channelId,
+                status: status,
+                paymentStatus: "paid",
+                totalAmount: 0, // Will update
+                netAmount: 0,
+                createdAt: date,
+                updatedAt: date,
+            }
+        });
+
+        // Add items
+        let total = 0;
+        const numItems = Math.floor(Math.random() * 3) + 1;
+
+        for (let j = 0; j < numItems; j++) {
+            const p = products[Math.floor(Math.random() * products.length)];
+            const qty = Math.floor(Math.random() * 2) + 1;
+            const price = p.price;
+
+            await prisma.orderItem.create({
+                data: {
+                    orderId: order.id,
+                    skuId: skuMap.get(p.sku),
+                    quantity: qty,
+                    unitPrice: price,
+                    totalPrice: qty * price,
+                }
+            });
+            total += qty * price;
+        }
+
+        await prisma.order.update({
+            where: { id: order.id },
+            data: {
+                totalAmount: total,
+                netAmount: total,
+            }
+        });
+    }
+
+    // 5. Create Production Batches
+    console.log("⚙️ Creating Production Batches...");
+    const batchStatuses = ["completed", "completed", "in_progress", "planned", "delayed"];
+
+    for (let i = 0; i < 15; i++) {
+        const p = products[Math.floor(Math.random() * products.length)];
+        const status = batchStatuses[Math.floor(Math.random() * batchStatuses.length)];
+        const date = subDays(new Date(), Math.floor(Math.random() * 3));
+
+        await prisma.productionBatch.create({
+            data: {
+                orgId: org.id,
+                batchNumber: `BATCH-${Date.now()}-${i}`,
+                status: status,
+                plannedDate: date,
+                startedAt: status !== "planned" ? date : null,
+                completedAt: status === "completed" ? addDays(date, 1) : null,
+                // We don't have BOMs linked yet, but that's optional in schema
+            }
+        });
+    }
+
+    console.log("✅ Demo data seeded successfully!");
+}
+
+main()
+    .catch((e) => {
+        console.error(e);
+        process.exit(1);
+    })
+    .finally(async () => {
+        await prisma.$disconnect();
+    });

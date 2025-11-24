@@ -63,7 +63,7 @@ export function StatCard({
         {/* Left Section */}
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          
+
           {isLoading ? (
             <div className="h-8 w-24 mt-2 bg-gray-200 rounded animate-pulse" />
           ) : (
@@ -76,21 +76,26 @@ export function StatCard({
           )}
 
           {/* Trend Indicator */}
-          {trend && !isLoading && (
+          {!isLoading && trend !== undefined && (
             <div className="flex items-center space-x-1 mt-3">
-              {trend.direction === 'up' ? (
-                <ArrowUp size={14} className="text-green-600" />
+              {trend === null ? (
+                <span className="text-xs text-gray-400 italic">Insufficient data for trend</span>
               ) : (
-                <ArrowDown size={14} className="text-red-600" />
+                <>
+                  {trend.direction === 'up' ? (
+                    <ArrowUp size={14} className="text-green-600" />
+                  ) : (
+                    <ArrowDown size={14} className="text-red-600" />
+                  )}
+                  <span
+                    className={`text-sm font-medium ${trend.direction === 'up' ? 'text-green-600' : 'text-red-600'
+                      }`}
+                  >
+                    {trend.value}%
+                  </span>
+                  <span className="text-xs text-gray-500">{trend.period}</span>
+                </>
               )}
-              <span
-                className={`text-sm font-medium ${
-                  trend.direction === 'up' ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {trend.value}%
-              </span>
-              <span className="text-xs text-gray-500">{trend.period}</span>
             </div>
           )}
         </div>

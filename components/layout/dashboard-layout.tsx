@@ -20,11 +20,11 @@ export function DashboardLayout({
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar - hidden on small screens to free space */}
         <Sidebar userPermissions={userPermissions} />
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto ml-64 p-8">
+        {/* Content - account for sidebar width on md+ screens */}
+        <main className="flex-1 overflow-y-auto ml-64 p-4 md:p-8">
           {children}
         </main>
       </div>
