@@ -217,9 +217,8 @@ export function ManagePermissionsDialog({
                             rp.permission,
                           ]) || [];
                         })
-                        .map(([id, permission]) => [id, permission])
                     ).values()
-                  ).map((permission) => (
+                  ).map((permission: any) => (
                     <div
                       key={permission.id}
                       className="text-sm text-gray-700"
