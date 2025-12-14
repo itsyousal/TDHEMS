@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
 
   // Experimental optimizations
   experimental: {
+    // Explicitly set Turbopack root to the project directory to avoid
+    // mis-detection errors on Windows when running the dev server.
+    turbopack: {
+      root: __dirname,
+    },
     // Optimize package imports for faster builds and smaller bundles
     optimizePackageImports: [
       "lucide-react",
