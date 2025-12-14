@@ -71,7 +71,7 @@ export async function PUT(req: NextRequest) {
       include: { role: true }
     });
 
-    const hasPermission = userRoles.some(ur => 
+    const hasPermission = userRoles.some((ur: { role: { slug: string } }) => 
       ur.role.slug === 'owner-super-admin' || ur.role.slug === 'general-manager'
     );
 
@@ -168,7 +168,7 @@ export async function DELETE(req: NextRequest) {
       include: { role: true }
     });
 
-    const hasPermission = userRoles.some(ur => 
+    const hasPermission = userRoles.some((ur: { role: { slug: string } }) => 
       ur.role.slug === 'owner-super-admin' || ur.role.slug === 'general-manager'
     );
 
