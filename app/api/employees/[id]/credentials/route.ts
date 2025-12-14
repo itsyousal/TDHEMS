@@ -25,7 +25,8 @@ export async function PATCH(
             },
         });
         const hasPermission = userRoles.some(
-            (ur) => ur.role.slug === 'admin' || ur.role.rolePermissions.some((rp) => rp.permission.slug === 'hr.manage')
+            (ur: { role: { slug: string, rolePermissions: { permission: { slug: string } }[] } }) =>
+                ur.role.slug === 'admin' || ur.role.rolePermissions.some((rp: { permission: { slug: string } }) => rp.permission.slug === 'hr.manage')
         );
         if (!hasPermission) {
             return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });

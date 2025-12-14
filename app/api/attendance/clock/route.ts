@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         }
 
         // Disallow clock actions for Owner/Super Admin
-        const isOwnerSuperAdmin = user.userRoles?.some((ur) => ur.role.slug === "owner-super-admin" || /owner/i.test(ur.role.name) || /super\s*admin/i.test(ur.role.name));
+        const isOwnerSuperAdmin = user.userRoles?.some((ur: { role: { slug: string, name: string } }) => ur.role.slug === "owner-super-admin" || /owner/i.test(ur.role.name) || /super\s*admin/i.test(ur.role.name));
         if (isOwnerSuperAdmin) {
             return new NextResponse("Forbidden for owner/super admin", { status: 403 });
         }

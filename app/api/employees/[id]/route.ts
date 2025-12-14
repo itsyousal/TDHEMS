@@ -28,7 +28,8 @@ async function checkPermission(userId: string) {
         },
     });
     return userRoles.some(
-        (ur) => ur.role.slug === 'admin' || ur.role.rolePermissions.some((rp) => rp.permission.slug === REQUIRED_PERMISSION)
+        (ur: { role: { slug: string, rolePermissions: { permission: { slug: string } }[] } }) =>
+            ur.role.slug === 'admin' || ur.role.rolePermissions.some((rp: { permission: { slug: string } }) => rp.permission.slug === REQUIRED_PERMISSION)
     );
 }
 

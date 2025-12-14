@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
     // Check permissions
     const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
-    const hasPermission = roles.some(role => 
+    const hasPermission = roles.some((role: string) => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
 
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
     // Check permissions
     const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
-    const hasPermission = roles.some(role => 
+    const hasPermission = roles.some((role: string) => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
 
@@ -193,7 +193,7 @@ export async function PUT(req: NextRequest) {
 
     // Check permissions
     const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
-    const hasPermission = roles.some(role => 
+    const hasPermission = roles.some((role: string) => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
 
@@ -283,7 +283,7 @@ export async function DELETE(req: NextRequest) {
 
     // Check permissions
     const roles = user.userRoles.map(ur => ur.role.slug);
-    const hasPermission = roles.some(role => 
+    const hasPermission = roles.some((role: string) => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
 

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user has admin permissions
     const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
-    const isAdmin = roles.some(role => 
+    const isAdmin = roles.some((role: string) => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
 
