@@ -179,7 +179,14 @@ const config: Config = {
   },
 
   plugins: [
-    require("@tailwindcss/typography"),
+    // Typography plugin is optional - only load if available
+    ...((() => {
+      try {
+        return [require("@tailwindcss/typography")];
+      } catch {
+        return [];
+      }
+    })()),
   ],
 };
 
