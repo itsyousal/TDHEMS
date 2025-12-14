@@ -1,12 +1,15 @@
 # Netlify deployment configuration for The Dough House system
 [build]
-  command = "npm ci && npm run build"
+  command = "npm install --legacy-peer-deps && npm run build"
   functions = "netlify/functions"
   publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
   NODE_ENV = "production"
+  NPM_FLAGS = "--legacy-peer-deps"
+  # Include dev dependencies for build (required for Tailwind CSS build)
+  CI = "false"
   # Disable turbopack in production for stability
   NEXT_SKIP_ENV_VALIDATION = "false"
 
