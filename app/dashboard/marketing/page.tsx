@@ -6,7 +6,7 @@ import { AccessDenied } from '@/components/access-denied';
 
 async function MarketingPage() {
   const session = await getAuthSession();
-  if (!session?.user?.organizationId) {
+  if (!session?.user?.organizationId || !session?.user?.id) {
     redirect('/auth/login');
   }
 

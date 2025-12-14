@@ -7,7 +7,7 @@ import { AccessDenied } from '@/components/access-denied';
 
 export default async function CRMPage() {
   const session = await getAuthSession();
-  if (!session?.user?.organizationId) {
+  if (!session?.user?.organizationId || !session?.user?.id) {
     redirect('/auth/login');
   }
 

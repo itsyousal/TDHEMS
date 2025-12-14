@@ -301,7 +301,7 @@ export default function InventoryPage() {
 
   const handleQuickSKUCreated = async (newSku: any) => {
     // Refresh SKU data to include the new SKU
-    await fetchInventoryData();
+    await refreshInventory();
     
     // Add a new row with the newly created SKU pre-selected
     setPoItems((prev) => [...prev, { skuId: newSku.id, quantity: '', unitCost: newSku.basePrice?.toString() || '' }]);

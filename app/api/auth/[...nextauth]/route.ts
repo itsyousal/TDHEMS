@@ -5,6 +5,33 @@ import bcrypt from "bcryptjs";
 import type { JWT } from "next-auth/jwt";
 import type { Prisma } from "@prisma/client";
 
+// Extend the built-in User type from NextAuth
+declare module "next-auth" {
+  interface User {
+    id?: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    organizationId?: string | null;
+    roles?: string[];
+    permissions?: string[];
+  }
+
+  interface Session {
+    user: User;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    organizationId?: string | null;
+    roles?: string[];
+    permissions?: string[];
+  }
+}
+
 type PrismaUserWithRoles = Prisma.UserGetPayload<{
   include: {
     userRoles: {

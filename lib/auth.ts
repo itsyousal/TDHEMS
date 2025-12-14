@@ -13,6 +13,7 @@ export interface DoughHouseSession extends Session {
     id?: string;
     organizationId?: string | null;
     roles?: string[];
+    permissions?: string[];
   };
 }
 
