@@ -1,6 +1,38 @@
 import React, { Suspense } from 'react';
+import { redirect } from 'next/navigation';
+import { getAuthSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/rbac';
+import { AccessDenied } from '@/components/access-denied';
 
 async function MarketingPage() {
+  const session = await getAuthSession();
+  if (!session?.user?.organizationId) {
+    redirect('/auth/login');
+  }
+
+  const orgId = session.user.organizationId;
+  const userId = session.user.id;
+
+  console.log('[Marketing Page] User ID:', userId);
+  console.log('[Marketing Page] Org ID:', orgId);
+  console.log('[Marketing Page] Session roles:', session.user.roles);
+  console.log('[Marketing Page] Session permissions:', session.user.permissions);
+
+  // Check Marketing permission
+  const hasMarketingAccess = await hasPermission(userId, 'marketing.view', orgId);
+  console.log('[Marketing Page] Has marketing access:', hasMarketingAccess);
+
+  if (!hasMarketingAccess) {
+    console.log('[Marketing Page] Denying access - showing AccessDenied');
+    return (
+      <AccessDenied
+        pageName="Marketing"
+        requiredPermission="marketing.view"
+        message="You don't have permission to access the Marketing section. Contact your administrator if you need access."
+      />
+    );
+  }
+
   // Empty state - no marketing data available yet
   const stats = {
     activeCampaigns: 0,

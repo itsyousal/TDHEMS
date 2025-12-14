@@ -1,0 +1,1 @@
+﻿{"userQuery":{"success":true,"count":1},"hrPermission":{"success":true,"data":{"id":"f9d7904c-c77b-475b-b856-4f4c545d4308","name":"Manage Employees","slug":"hr.manage","description":null,"category":"hr","createdAt":"2025-11-24T07:26:13.049Z","updatedAt":"2025-11-24T07:26:13.049Z"}},"employeeQuery":{"success":true,"count":0}}

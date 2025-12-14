@@ -1,19 +1,31 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthSession } from "@/lib/auth";
+import { InventoryType } from "@prisma/client";
 
-export async function GET() {
+export async function GET(req: Request) {
     const session = await getAuthSession();
     if (!session) {
         return new NextResponse("Unauthorized", { status: 401 });
     }
 
     try {
+        const url = new URL(req.url);
+        const typeParam = url.searchParams.get("type");
+        let inventoryType: InventoryType | undefined;
+
+        if (typeParam === "raw") {
+            inventoryType = InventoryType.RAW;
+        } else if (typeParam === "finished") {
+            inventoryType = InventoryType.FINISHED;
+        }
+
         const inventory = await prisma.inventory.findMany({
             include: {
                 sku: true,
                 location: true,
             },
+            where: inventoryType ? { sku: { inventoryType } } : undefined,
             orderBy: {
                 sku: {
                     name: "asc",
@@ -24,11 +36,14 @@ export async function GET() {
         const formattedInventory = inventory.map((item) => ({
             id: item.id,
             sku: item.sku.code,
+            skuId: item.skuId,
             desc: item.sku.name,
-            loc: item.location.slug,
+            loc: item.location.name,
+            locationId: item.locationId,
             avail: item.availableQuantity,
             res: item.reservedQuantity,
-            status: item.availableQuantity > 20 ? "In Stock" : "Low Stock", // Simple logic
+            status: item.availableQuantity <= 0 ? "Out of Stock" : item.availableQuantity <= (item.reorderLevel ?? 20) ? "Low Stock" : "In Stock",
+            type: item.sku.inventoryType,
         }));
 
         return NextResponse.json(formattedInventory);

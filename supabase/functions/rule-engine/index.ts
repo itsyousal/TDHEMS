@@ -1,4 +1,5 @@
 // supabase/functions/rule-engine/index.ts
+// @ts-nocheck
 // Deno-based Supabase Edge Function for Rule Engine
 // Deploy: supabase functions deploy rule-engine
 

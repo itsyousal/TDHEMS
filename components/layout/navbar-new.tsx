@@ -20,13 +20,13 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
         <div className="flex items-center space-x-4">
           <button
             onClick={onMenuToggle}
-            className="p-2 rounded-lg lg:hidden hover:bg-gray-100 transition-colors"
+            className="p-3 rounded-lg lg:hidden hover:bg-dough-brown-100 active:bg-dough-brown-200 transition-all border-2 border-gray-300 hover:border-dough-brown-500 shadow-sm"
             aria-label="Toggle menu"
           >
-            <Menu size={24} className="text-gray-700" />
+            <Menu size={28} className="text-gray-800" strokeWidth={2.5} />
           </button>
           <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="h-8 w-8 rounded-lg bg-dough-brown-500 flex items-center justify-center text-white font-bold text-sm">
+            <div className="h-8 w-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-900 font-bold text-sm">
               DH
             </div>
             <span className="hidden sm:inline text-lg font-semibold text-gray-900">The Dough House</span>

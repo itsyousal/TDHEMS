@@ -3,38 +3,57 @@ import { prisma } from '@/lib/db';
 import { getAuthSession } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
+interface CreateEmployeePayload {
+    employeeId?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    department?: string;
+    designation?: string;
+    roleSlug?: string;
+    joinDate?: string;
+    password?: string;
+    salary?: string | number;
+}
+
+const REQUIRED_PERMISSION = 'hr.manage';
+
+async function userHasHrAccess(userId: string) {
+    const userRoles = await prisma.userRole.findMany({
+        where: { userId },
+        include: {
+            role: {
+                include: {
+                    rolePermissions: {
+                        include: { permission: true }
+                    }
+                }
+            }
+        }
+    });
+
+    return userRoles.some(ur =>
+        ur.role.slug === 'admin' ||
+        ur.role.rolePermissions.some(rp => rp.permission.slug === REQUIRED_PERMISSION)
+    );
+}
+
 // GET /api/employees - List all employees
 export async function GET(req: NextRequest) {
     try {
         const session = await getAuthSession();
-        if (!session) {
+        const userId = session?.user?.id;
+        if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Check if user has hr.manage or admin permission
-        const userRoles = await prisma.userRole.findMany({
-            where: { userId: session.user.id },
-            include: {
-                role: {
-                    include: {
-                        rolePermissions: {
-                            include: { permission: true }
-                        }
-                    }
-                }
-            }
-        });
-
-        const hasPermission = userRoles.some(ur =>
-            ur.role.slug === 'admin' ||
-            ur.role.rolePermissions.some(rp => rp.permission.slug === 'hr.manage')
-        );
-
+        const hasPermission = await userHasHrAccess(userId);
         if (!hasPermission) {
             return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
         }
 
-        // Fetch employees with their user accounts
+        // Fetch employees with their user accounts and role details
         const employees = await prisma.employee.findMany({
             include: {
                 user: {
@@ -43,6 +62,16 @@ export async function GET(req: NextRequest) {
                         email: true,
                         isActive: true,
                         lastLogin: true,
+                        userRoles: {
+                            include: {
+                                role: {
+                                    select: { 
+                                        slug: true,
+                                        name: true 
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -60,34 +89,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const session = await getAuthSession();
-        if (!session) {
+        const userId = session?.user?.id;
+        if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Check if user has hr.manage or admin permission
-        const userRoles = await prisma.userRole.findMany({
-            where: { userId: session.user.id },
-            include: {
-                role: {
-                    include: {
-                        rolePermissions: {
-                            include: { permission: true }
-                        }
-                    }
-                }
-            }
-        });
-
-        const hasPermission = userRoles.some(ur =>
-            ur.role.slug === 'admin' ||
-            ur.role.rolePermissions.some(rp => rp.permission.slug === 'hr.manage')
-        );
-
+        const hasPermission = await userHasHrAccess(userId);
         if (!hasPermission) {
             return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
         }
 
-        const body = await req.json();
+        const body = (await req.json()) as CreateEmployeePayload;
         const {
             employeeId,
             firstName,
@@ -96,10 +108,13 @@ export async function POST(req: NextRequest) {
             phone,
             department,
             designation,
+            roleSlug,
             joinDate,
             password,
             salary,
         } = body;
+
+        const requestedRoleSlug = roleSlug?.trim() || 'employee';
 
         // Validate required fields
         if (!employeeId || !firstName || !lastName || !email || !password) {
@@ -117,7 +132,7 @@ export async function POST(req: NextRequest) {
 
         // Get user's organization
         const userOrg = await prisma.userOrgMap.findFirst({
-            where: { userId: session.user.id }
+            where: { userId }
         });
 
         if (!userOrg) {
@@ -126,6 +141,12 @@ export async function POST(req: NextRequest) {
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
+
+        const salaryValue = typeof salary === 'number'
+            ? salary
+            : salary
+                ? parseFloat(String(salary))
+                : null;
 
         // Create user and employee in a transaction
         const result = await prisma.$transaction(async (tx) => {
@@ -154,46 +175,54 @@ export async function POST(req: NextRequest) {
                     department,
                     designation,
                     joinDate: joinDate ? new Date(joinDate) : new Date(),
-                    salary: salary ? parseFloat(salary) : null,
+                    salary: salaryValue,
                     status: 'active',
                 }
             });
 
-            // Assign default "Employee" role
-            const employeeRole = await tx.role.findFirst({
-                where: { slug: 'employee' }
+            const desiredRoleSlug = requestedRoleSlug;
+            let assignedRole = await tx.role.findFirst({
+                where: { slug: desiredRoleSlug }
             });
 
-            if (employeeRole) {
+            if (!assignedRole && desiredRoleSlug !== 'employee') {
+                assignedRole = await tx.role.findFirst({
+                    where: { slug: 'employee' }
+                });
+            }
+
+            if (assignedRole) {
                 await tx.userRole.create({
                     data: {
                         userId: user.id,
-                        roleId: employeeRole.id,
-                        orgId: userOrg.orgId,
-                    }
-                });
-
-                // Map user to organization
-                await tx.userOrgMap.create({
-                    data: {
-                        userId: user.id,
+                        roleId: assignedRole.id,
                         orgId: userOrg.orgId,
                     }
                 });
             }
 
-            // Log the action
+            await tx.userOrgMap.create({
+                data: {
+                    userId: user.id,
+                    orgId: userOrg.orgId,
+                }
+            });
+
+            const assignedRoleSlugForLog = assignedRole?.slug || requestedRoleSlug;
+
             await tx.auditLog.create({
                 data: {
-                    userId: session.user.id,
+                    userId,
                     action: 'employee.create',
-                    entityType: 'Employee',
-                    entityId: employee.id,
-                    metadata: {
+                    resource: 'Employee',
+                    resourceId: employee.id,
+                    changes: {
                         employeeId,
                         email,
                         name: `${firstName} ${lastName}`,
+                        role: assignedRoleSlugForLog,
                     },
+                    status: 'success'
                 }
             });
 
@@ -214,3 +243,4 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Failed to create employee' }, { status: 500 });
     }
 }
+

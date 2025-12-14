@@ -16,8 +16,11 @@ import {
   CheckSquare,
   Settings,
   Gauge,
+  CreditCard,
+  ShoppingBag,
   ChevronRight,
   X,
+  Lock,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
@@ -36,64 +39,141 @@ const navItems: NavItem[] = [
     icon: <LayoutDashboard size={20} />,
   },
   {
-    name: 'Orders',
-    href: '/dashboard/orders',
-    icon: <ShoppingCart size={20} />,
-    permission: 'orders.view',
-  },
-  {
-    name: 'Production',
-    href: '/dashboard/production',
-    icon: <Zap size={20} />,
-    permission: 'production.view',
-  },
-  {
-    name: 'Inventory',
-    href: '/dashboard/inventory',
-    icon: <Box size={20} />,
-    permission: 'inventory.view',
-  },
-  {
-    name: 'Warehouse',
-    href: '/dashboard/warehouse',
-    icon: <Warehouse size={20} />,
-    permission: 'warehouse.view',
-  },
-  {
-    name: 'HR & People',
-    href: '/dashboard/hr',
+    name: 'Admin Dashboard',
+    href: '/dashboard/admin',
     icon: <Users size={20} />,
-    permission: 'hr.view',
+    permission: 'admin.view',
+    submenu: [
+      {
+        name: 'Password Management',
+        href: '/dashboard/admin/password-management',
+        icon: <></>,
+        permission: 'user.reset_password',
+      },
+    ],
   },
   {
-    name: 'Marketing',
-    href: '/dashboard/marketing',
-    icon: <Megaphone size={20} />,
-    permission: 'marketing.view',
+    name: 'Sales',
+    href: '/dashboard/sales',
+    icon: <ShoppingCart size={20} />,
+    submenu: [
+      {
+        name: 'Orders',
+        href: '/dashboard/orders',
+        icon: <></>,
+        permission: 'orders.view',
+      },
+      {
+        name: 'POS',
+        href: '/pos',
+        icon: <></>,
+      },
+      {
+        name: 'Customer Portal',
+        href: '/order',
+        icon: <></>,
+      },
+    ],
   },
   {
-    name: 'CRM',
-    href: '/dashboard/crm',
-    icon: <Users2 size={20} />,
-    permission: 'crm.view',
+    name: 'Operations',
+    href: '/dashboard/operations',
+    icon: <Zap size={20} />,
+    submenu: [
+      {
+        name: 'Production',
+        href: '/dashboard/production',
+        icon: <></>,
+        permission: 'production.view',
+      },
+      {
+        name: 'Inventory',
+        href: '/dashboard/inventory',
+        icon: <></>,
+        permission: 'inventory.view',
+      },
+      {
+        name: 'Warehouse',
+        href: '/dashboard/warehouse',
+        icon: <></>,
+        permission: 'warehouse.view',
+      },
+      {
+        name: 'Menu Management',
+        href: '/dashboard/menu',
+        icon: <></>,
+        permission: 'inventory.view',
+      },
+    ],
   },
   {
-    name: 'Finance',
-    href: '/dashboard/finance',
+    name: 'People',
+    href: '/dashboard/people',
+    icon: <Users size={20} />,
+    submenu: [
+      {
+        name: 'HR & Employees',
+        href: '/dashboard/hr',
+        icon: <></>,
+        permission: 'hr.view',
+      },
+      {
+        name: 'Employee Management',
+        href: '/dashboard/employees',
+        icon: <></>,
+        permission: 'hr.view',
+      },
+    ],
+  },
+  {
+    name: 'Business',
+    href: '/dashboard/business',
     icon: <DollarSign size={20} />,
-    permission: 'finance.view',
+    submenu: [
+      {
+        name: 'Finance',
+        href: '/dashboard/finance',
+        icon: <></>,
+        permission: 'finance.view',
+      },
+      {
+        name: 'Marketing',
+        href: '/dashboard/marketing',
+        icon: <></>,
+        permission: 'marketing.view',
+      },
+      {
+        name: 'CRM',
+        href: '/dashboard/crm',
+        icon: <></>,
+        permission: 'crm.view',
+      },
+      {
+        name: 'Customers',
+        href: '/dashboard/customers',
+        icon: <></>,
+        permission: 'crm.view',
+      },
+    ],
   },
   {
-    name: 'Checklists',
-    href: '/dashboard/checklists',
-    icon: <CheckSquare size={20} />,
-    permission: 'checklists.view',
-  },
-  {
-    name: 'Automation',
-    href: '/dashboard/automation',
+    name: 'Tools',
+    href: '/dashboard/tools',
     icon: <Gauge size={20} />,
-    permission: 'rules_engine.view',
+    submenu: [
+      {
+        name: 'Checklists',
+        href: '/dashboard/checklists',
+        icon: <></>,
+        permission: 'checklists.view',
+      },
+      {
+        name: 'Automation',
+        href: '/dashboard/automation',
+        icon: <></>,
+        permission: 'rules_engine.view',
+      },
+    ],
   },
   {
     name: 'Settings',
@@ -120,15 +200,21 @@ export function Sidebar({ userPermissions = [], isOpen = false, onClose }: Sideb
     );
   };
 
-  const derivedPermissions: string[] =
-    userPermissions && userPermissions.length > 0
-      ? userPermissions
-      : [];
+  // Prefer explicit `userPermissions` prop when provided, otherwise derive from session
+  const sessionPermissions: string[] = (session?.user as any)?.permissions || [];
+  const sessionRoles: string[] = (session?.user as any)?.roles || [];
+
+  const effectivePermissions =
+    userPermissions && userPermissions.length > 0 ? userPermissions : sessionPermissions;
+
+  const isSuperAdmin = sessionRoles.includes('owner-super-admin') || sessionRoles.includes('super-admin');
 
   const hasPermission = (permission?: string): boolean => {
     if (!permission) return true;
-    if (!derivedPermissions || derivedPermissions.length === 0) return true;
-    return derivedPermissions.includes(permission);
+    if (isSuperAdmin) return true;
+    // If no explicit permissions are available, deny access to permissioned routes
+    if (!effectivePermissions || effectivePermissions.length === 0) return false;
+    return effectivePermissions.includes(permission);
   };
 
   const isActive = (href: string): boolean => {

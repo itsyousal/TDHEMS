@@ -1,10 +1,21 @@
-import NextAuth, { type NextAuthOptions } from "next-auth";
+import NextAuth, { type NextAuthOptions, type User } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
-import type { User } from "next-auth";
+import type { JWT } from "next-auth/jwt";
+import type { Prisma } from "@prisma/client";
 
-const authOptions: NextAuthOptions = {
+type PrismaUserWithRoles = Prisma.UserGetPayload<{
+  include: {
+    userRoles: {
+      include: {
+        role: true;
+      };
+    };
+  };
+}>;
+
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -17,7 +28,7 @@ const authOptions: NextAuthOptions = {
           throw new Error("Missing credentials");
         }
 
-        const user = await prisma.user.findUnique({
+        const user = (await prisma.user.findUnique({
           where: { email: credentials.email },
           include: {
             userRoles: {
@@ -26,7 +37,7 @@ const authOptions: NextAuthOptions = {
               },
             },
           },
-        });
+        })) as PrismaUserWithRoles | null;
 
         if (!user) {
           throw new Error("User not found");
@@ -38,7 +49,7 @@ const authOptions: NextAuthOptions = {
         }
 
         // Check password (use `password` field from Prisma User model)
-        const hash = (user as any).password ?? "";
+        const hash = user.password ?? "";
         const passwordMatch = await bcrypt.compare(credentials.password, hash);
         if (!passwordMatch) {
           throw new Error("Invalid password");
@@ -50,13 +61,33 @@ const authOptions: NextAuthOptions = {
           data: { lastLogin: new Date() },
         });
 
-        // Return user object with roles
+        // Return user object with roles and permissions
+        const roles = user.userRoles.map((ur) => ur.role);
+        const roleNames = roles.map((role) => role.slug);
+
+        // Fetch permissions for these roles
+        const permissions = await prisma.permission.findMany({
+          where: {
+            rolePermissions: {
+              some: {
+                roleId: { in: roles.map((role) => role.id) }
+              }
+            }
+          },
+          select: { slug: true }
+        });
+
+        const permissionSlugs = permissions.map(p => p.slug);
+        const organizationId = user.userRoles[0]?.orgId ?? null;
+
         return {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          roles: user.userRoles.map((ur: any) => ur.role.name),
+          roles: roleNames,
+          permissions: permissionSlugs,
+          organizationId,
         } as User;
       },
     }),
@@ -73,29 +104,54 @@ const authOptions: NextAuthOptions = {
     error: "/auth/login",
   },
   callbacks: {
-    async jwt({ token, user }: { token: any; user?: any }) {
+    async jwt({ token, user }) {
+      const extendedToken = token as ExtendedToken;
       if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.firstName = user.firstName;
-        token.lastName = user.lastName;
-        token.organizationId = user.organizationId;
-        token.roles = user.roles;
+        const authUser = user as AuthUserClaims;
+        extendedToken.id = authUser.id;
+        extendedToken.email = authUser.email;
+        extendedToken.firstName = authUser.firstName;
+        extendedToken.lastName = authUser.lastName;
+        extendedToken.organizationId = authUser.organizationId ?? null;
+        extendedToken.roles = authUser.roles;
+        extendedToken.permissions = authUser.permissions;
       }
-      return token;
+      return extendedToken;
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }) {
+      const extendedToken = token as ExtendedToken;
       if (session.user) {
-        session.user.id = token.id;
-        session.user.email = token.email;
-        session.user.firstName = token.firstName;
-        session.user.lastName = token.lastName;
-        session.user.organizationId = token.organizationId;
-        session.user.roles = token.roles;
+        const sessionUser = session.user as AuthUserClaims;
+        sessionUser.id = extendedToken.id;
+        sessionUser.email = extendedToken.email;
+        sessionUser.firstName = extendedToken.firstName;
+        sessionUser.lastName = extendedToken.lastName;
+        sessionUser.organizationId = extendedToken.organizationId;
+        sessionUser.roles = extendedToken.roles;
+        sessionUser.permissions = extendedToken.permissions;
       }
       return session;
     },
   },
+};
+
+type ExtendedToken = JWT & {
+  id?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  organizationId?: string | null;
+  roles?: string[];
+  permissions?: string[];
+};
+
+type AuthUserClaims = {
+  id?: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  organizationId?: string | null;
+  roles?: string[];
+  permissions?: string[];
 };
 
 const handler = NextAuth(authOptions);

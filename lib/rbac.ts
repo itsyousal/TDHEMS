@@ -1,6 +1,9 @@
 // src/lib/rbac.ts
 import { prisma } from "./db";
 
+// Dev user ID that bypasses permission checks in development
+const DEV_USER_ID = "00000000-0000-0000-0000-000000000001";
+
 export async function hasPermission(
   userId: string,
   permissionSlug: string,
@@ -8,6 +11,11 @@ export async function hasPermission(
   locationId?: string
 ): Promise<boolean> {
   try {
+    // Allow dev user to bypass all permission checks in development
+    if (process.env.NODE_ENV !== "production" && userId === DEV_USER_ID) {
+      return true;
+    }
+
     const userWithRoles = await prisma.user.findUnique({
       where: { id: userId },
       include: {

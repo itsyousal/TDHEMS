@@ -1,7 +1,39 @@
 import React, { Suspense } from 'react';
-import prisma from '@/lib/db';
+import { redirect } from 'next/navigation';
+import { getAuthSession } from '@/lib/auth';
+import { hasPermission } from '@/lib/rbac';
+import { prisma } from '@/lib/db';
+import { AccessDenied } from '@/components/access-denied';
 
 async function CustomersTable() {
+  const session = await getAuthSession();
+  if (!session?.user?.organizationId) {
+    redirect('/auth/login');
+  }
+
+  const orgId = session.user.organizationId;
+  const userId = session.user.id;
+
+  console.log('[Customers Page] User ID:', userId);
+  console.log('[Customers Page] Org ID:', orgId);
+  console.log('[Customers Page] Session roles:', session.user.roles);
+  console.log('[Customers Page] Session permissions:', session.user.permissions);
+
+  // Check CRM permission (customers are part of CRM)
+  const hasCustomerAccess = await hasPermission(userId, 'crm.view', orgId);
+  console.log('[Customers Page] Has customer access:', hasCustomerAccess);
+
+  if (!hasCustomerAccess) {
+    console.log('[Customers Page] Denying access - showing AccessDenied');
+    return (
+      <AccessDenied
+        pageName="Customers"
+        requiredPermission="crm.view"
+        message="You don't have permission to access the Customers section. Contact your administrator if you need access."
+      />
+    );
+  }
+
   const [total, list] = await Promise.all([
     prisma.customer.count(),
     prisma.customer.findMany({

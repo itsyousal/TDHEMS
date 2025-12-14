@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { ChangePasswordForm } from '@/components/settings/change-password-form';
 
 async function SettingsPage() {
   return (
@@ -11,8 +12,8 @@ async function SettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Organization Settings */}
         <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold mb-6">Organization Settings</h2>
-          
+          <h2 className="text-lg font-semibold mb-6 text-gray-900">Organization Settings</h2>
+
           <div className="space-y-6">
             {/* Organization Info */}
             <div>
@@ -73,8 +74,10 @@ async function SettingsPage() {
 
         {/* Quick Links */}
         <div className="space-y-6">
+          <ChangePasswordForm />
+
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4">Support</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900">Support</h2>
             <div className="space-y-3">
               <a href="#" className="flex items-center text-dough-brown-600 hover:text-dough-brown-700 text-sm">
                 <span className="mr-2">→</span> Documentation
@@ -92,7 +95,7 @@ async function SettingsPage() {
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4">System Status</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-900">System Status</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-700">Database</span>

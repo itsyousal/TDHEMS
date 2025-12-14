@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAuthSession } from "@/lib/auth";
+import { InventoryType } from "@prisma/client";
 
 export async function GET() {
     const session = await getAuthSession();
@@ -9,22 +10,27 @@ export async function GET() {
     }
 
     try {
-        const [totalSkus, inStockItems, lowStockItems, recentMovements] = await Promise.all([
-            // Total SKUs
-            prisma.sku.count({
-                where: { isActive: true },
-            }),
-            // In Stock (SKUs with quantity > 0)
-            prisma.inventory.count({
-                where: { quantity: { gt: 0 } },
-            }),
-            // Low Stock (SKUs with quantity <= reorderLevel)
-            prisma.inventory.count({
-                where: {
-                    quantity: { lte: 20 }, // Using hardcoded 20 for now as reorderLevel might be null
-                },
-            }),
-            // Recent Movements (StockLedger entries in last 24h)
+        const [
+            totalSkus,
+            rawSkus,
+            finishedSkus,
+            inStockItems,
+            rawInStockItems,
+            finishedInStockItems,
+            lowStockItems,
+            rawLowStockItems,
+            finishedLowStockItems,
+            recentMovements,
+        ] = await Promise.all([
+            prisma.sku.count({ where: { isActive: true } }),
+            prisma.sku.count({ where: { isActive: true, inventoryType: InventoryType.RAW } }),
+            prisma.sku.count({ where: { isActive: true, inventoryType: InventoryType.FINISHED } }),
+            prisma.inventory.count({ where: { quantity: { gt: 0 } } }),
+            prisma.inventory.count({ where: { quantity: { gt: 0 }, sku: { inventoryType: InventoryType.RAW } } }),
+            prisma.inventory.count({ where: { quantity: { gt: 0 }, sku: { inventoryType: InventoryType.FINISHED } } }),
+            prisma.inventory.count({ where: { quantity: { lte: 20 } } }),
+            prisma.inventory.count({ where: { quantity: { lte: 20 }, sku: { inventoryType: InventoryType.RAW } } }),
+            prisma.inventory.count({ where: { quantity: { lte: 20 }, sku: { inventoryType: InventoryType.FINISHED } } }),
             prisma.stockLedger.count({
                 where: {
                     createdAt: {
@@ -36,8 +42,14 @@ export async function GET() {
 
         return NextResponse.json({
             totalSkus,
+            rawSkus,
+            finishedSkus,
             inStockItems,
+            rawInStockItems,
+            finishedInStockItems,
             lowStockItems,
+            rawLowStockItems,
+            finishedLowStockItems,
             recentMovements,
         });
     } catch (error) {

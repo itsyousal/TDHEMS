@@ -59,9 +59,9 @@ export const createChecklistSchema = z.object({
 export const createRuleSchema = z.object({
   name: z.string(),
   trigger: z.enum(["event", "cron", "threshold"]),
-  triggerConfig: z.record(z.any()),
-  conditions: z.array(z.record(z.any())),
-  actions: z.array(z.record(z.any())),
+  triggerConfig: z.record(z.string(), z.any()),
+  conditions: z.array(z.record(z.string(), z.any())),
+  actions: z.array(z.record(z.string(), z.any())),
   approvalRequired: z.boolean().default(false),
 });
 

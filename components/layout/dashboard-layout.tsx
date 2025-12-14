@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './navbar';
 import { Sidebar } from './sidebar';
 
@@ -13,21 +13,52 @@ export function DashboardLayout({
   children,
   userPermissions = [],
 }: DashboardLayoutProps) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Close sidebar on route change (for mobile)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isSidebarOpen]);
+
   return (
-    <div className="flex h-screen flex-col bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Navigation Bar */}
-      <Navbar />
+      <Navbar 
+        onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        isSidebarOpen={isSidebarOpen}
+      />
 
-      {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - hidden on small screens to free space */}
-        <Sidebar userPermissions={userPermissions} />
+      {/* Sidebar */}
+      <Sidebar 
+        userPermissions={userPermissions}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
 
-        {/* Content - account for sidebar width on md+ screens */}
-        <main className="flex-1 overflow-y-auto ml-64 p-4 md:p-8">
+      {/* Main Content */}
+      <main className="lg:ml-72 min-h-[calc(100vh-3.5rem)] transition-all duration-300">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
           {children}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
