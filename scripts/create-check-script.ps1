@@ -1,3 +1,4 @@
+@'
 # Pre-deployment verification script for Netlify (Windows PowerShell)
 
 Write-Host "==========================================" -ForegroundColor Cyan
@@ -55,7 +56,7 @@ Write-Host ""
 # 5. Check environment variables
 Write-Host "5. Checking environment variables..." -ForegroundColor Cyan
 if (Test-Path ".env") {
-    $env_vars = Get-Content ".env" | Where-Object { $_ -match '^[A-Z]' } | Measure-Object
+    $env_vars = Get-Content ".env" | Where-Object { $_ -match "^[A-Z]" } | Measure-Object
     if ($env_vars.Count -gt 0) {
         Write-Host "✓ Found $($env_vars.Count) environment variables" -ForegroundColor Green
     }
@@ -109,7 +110,7 @@ Write-Host "Pre-Deployment Checklist Complete" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. git add . ; git commit -m 'Ready for deployment'"
+Write-Host "1. git add . && git commit -m 'Ready for deployment'"
 Write-Host "2. git push origin main"
 Write-Host "3. Go to https://app.netlify.com"
 Write-Host "4. Connect your dough-house GitHub repository"
@@ -117,3 +118,4 @@ Write-Host "5. Set environment variables in Netlify UI"
 Write-Host "6. Deploy"
 Write-Host ""
 Write-Host "See NETLIFY_DEPLOYMENT.md for detailed instructions." -ForegroundColor Gray
+'@ | Out-File scripts/pre-deploy-check.ps1 -Encoding UTF8
