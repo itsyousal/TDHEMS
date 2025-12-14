@@ -1,6 +1,6 @@
 # Netlify deployment configuration for The Dough House system
 [build]
-  command = "npm run build"
+  command = "npm ci && npm run build"
   functions = "netlify/functions"
   publish = ".next"
 
