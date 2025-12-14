@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check permissions
-    const roles = user.userRoles.map(ur => ur.role.slug);
+    const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
     const hasPermission = roles.some(role => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check permissions
-    const roles = user.userRoles.map(ur => ur.role.slug);
+    const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
     const hasPermission = roles.some(role => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
@@ -192,7 +192,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Check permissions
-    const roles = user.userRoles.map(ur => ur.role.slug);
+    const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
     const hasPermission = roles.some(role => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );

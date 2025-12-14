@@ -21,7 +21,7 @@ export async function PATCH(
             include: { role: true }
         });
 
-        const isAdmin = currentUserRoles.some(ur => ur.role.slug === 'admin' || ur.role.slug === 'owner-super-admin');
+        const isAdmin = currentUserRoles.some((ur: { role: { slug: string } }) => ur.role.slug === 'admin' || ur.role.slug === 'owner-super-admin');
 
         if (!isAdmin) {
             return NextResponse.json({ error: 'Forbidden - Admin access required' }, { status: 403 });
