@@ -106,7 +106,7 @@ export const authOptions: NextAuthOptions = {
           select: { slug: true }
         });
 
-        const permissionSlugs = permissions.map(p => p.slug);
+        const permissionSlugs = permissions.map((p: { slug: string }) => p.slug);
         const organizationId = user.userRoles[0]?.orgId ?? null;
 
         return {
