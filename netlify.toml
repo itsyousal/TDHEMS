@@ -1,7 +1,6 @@
 # Netlify deployment configuration for The Dough House system
 [build]
   command = "npm ci --force && npm run build"
-  functions = "netlify/functions"
   publish = ".next"
 
 [build.environment]
@@ -13,19 +12,10 @@
 # Next.js function configuration
 [functions]
   node_bundler = "esbuild"
-  directory = "netlify/functions"
 
 # Rewrite API routes to Next.js serverless functions
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/nextjs-handler"
-  status = 200
-
-# Fallback for SPA routing
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 404
+## Note: No manual redirects are required for Next.js on Netlify v5.
+## The adapter provisions functions and routing automatically.
 
 # Security headers
 [[headers]]
