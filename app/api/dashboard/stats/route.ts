@@ -206,7 +206,9 @@ export async function GET() {
                 time: b.updatedAt,
             }))
         ]
-            .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+            .sort(
+                (a: { time: Date }, b: { time: Date }) => new Date(b.time).getTime() - new Date(a.time).getTime()
+            )
             .slice(0, 5)
             .map((a: { id: string; type: string; message: string; time: Date }) => ({
                 ...a,

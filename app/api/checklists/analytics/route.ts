@@ -187,7 +187,9 @@ export async function GET(request: Request) {
             avgCompletionTimeMinutes: avgTime,
           },
           topPerformers: topPerformersWithNames,
-          checklistBreakdown: checklistBreakdownWithNames.sort((a, b) => b.runCount - a.runCount),
+          checklistBreakdown: checklistBreakdownWithNames.sort(
+            (a: { runCount: number }, b: { runCount: number }) => b.runCount - a.runCount
+          ),
         });
       }
 
@@ -300,7 +302,9 @@ export async function GET(request: Request) {
         });
 
         return NextResponse.json({
-          data: performanceData.sort((a, b) => b.totalRuns - a.totalRuns),
+          data: performanceData.sort(
+            (a: { totalRuns: number }, b: { totalRuns: number }) => b.totalRuns - a.totalRuns
+          ),
         });
       }
 
