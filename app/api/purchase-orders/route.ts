@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 
@@ -241,7 +242,7 @@ export async function POST(request: Request) {
     const poNumber = `PO-${dateStr}-${String(poCount + 1).padStart(4, '0')}`;
 
     // Create the purchase order with transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const purchaseOrder = await tx.purchaseOrder.create({
         data: {
           orgId,

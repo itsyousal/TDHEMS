@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 
 const TAX_RATE = 0.05;
@@ -220,7 +221,7 @@ export async function POST(request: Request) {
     const computedTax = Number((computedTotal * TAX_RATE).toFixed(2));
     const netAmount = Math.max(computedTotal + computedTax - sanitizedDiscount, 0);
 
-    const order = await prisma.$transaction(async (tx) => {
+    const order = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const createdOrder = await tx.order.create({
         data: {
           orgId,

@@ -343,7 +343,7 @@ export async function GET(request: Request) {
             ...data,
             completionRate: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0,
           }))
-          .sort((a, b) => a.date.localeCompare(b.date));
+          .sort((a: { date: string }, b: { date: string }) => a.date.localeCompare(b.date));
 
         return NextResponse.json({ trends });
       }

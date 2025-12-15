@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 
@@ -123,7 +124,7 @@ export async function PATCH(
       updateData.receivedBy = session.user.id;
 
       // Process inventory updates
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // Default: receive all items at full quantity if no specific items provided
         const itemsToReceive = receivedItems || purchaseOrder.items.map((item: { id: string; quantity: number }) => ({
           itemId: item.id,
@@ -187,7 +188,7 @@ export async function PATCH(
     } else if (status === 'cancelled') {
       // If cancelling and already received, reverse inventory
       if (purchaseOrder.status === 'received' || purchaseOrder.status === 'partial') {
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           for (const item of purchaseOrder.items) {
             if (item.receivedQuantity && item.receivedQuantity > 0) {
               const inventory = await tx.inventory.findFirst({

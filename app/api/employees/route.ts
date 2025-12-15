@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import bcrypt from 'bcryptjs';
 
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
                 : null;
 
         // Create user and employee in a transaction
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             // Create user account
             const user = await tx.user.create({
                 data: {

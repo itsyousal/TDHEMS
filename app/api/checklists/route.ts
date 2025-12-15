@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
     const filteredChecklists = canManage
       ? checklists
       : checklists.filter(
-          (c) =>
+          (c: { roles: string[] }) =>
             c.roles.length === 0 || // Open to all
             c.roles.some((role: string) => userRoleSlugs.includes(role))
         );
@@ -174,7 +175,7 @@ export async function POST(request: Request) {
     }
 
     // Create checklist with items in a transaction
-    const checklist = await prisma.$transaction(async (tx) => {
+    const checklist = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const newChecklist = await tx.checklist.create({
         data: {
           orgId,

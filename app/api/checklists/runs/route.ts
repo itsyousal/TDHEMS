@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 
@@ -205,7 +206,7 @@ export async function POST(request: Request) {
     }
 
     // Create new run with evidence placeholders
-    const run = await prisma.$transaction(async (tx) => {
+    const run = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const newRun = await tx.checklistRun.create({
         data: {
           checklistId,

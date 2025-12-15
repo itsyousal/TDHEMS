@@ -92,7 +92,7 @@ export async function GET() {
         // Process attendance to get current status per user
         const userLatestStatus = new Map<string, string>();
         const sortedEvents = [...todayAttendance].sort(
-            (a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime()
+            (a: { eventTime: Date }, b: { eventTime: Date }) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime()
         );
         for (const event of sortedEvents) {
             if (!userLatestStatus.has(event.userId)) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 
 export async function PATCH(
@@ -67,7 +68,7 @@ export async function PATCH(
         // Get user's org (from employee record)
         const orgId = employee.orgId;
 
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             // Remove existing roles for this user in this org
             await tx.userRole.deleteMany({
                 where: {
