@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 
@@ -128,7 +129,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     } = body;
 
     // Update checklist and items in a transaction
-    const checklist = await prisma.$transaction(async (tx) => {
+    const checklist = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const updated = await tx.checklist.update({
         where: { id },
         data: {
