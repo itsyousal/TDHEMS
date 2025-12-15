@@ -79,11 +79,11 @@ export async function GET(req: NextRequest) {
     const todayTotal = todayOrders.reduce((sum, order) => sum + order.netAmount, 0);
     const yesterdayTotal = yesterdayOrders.reduce((sum, order) => sum + order.netAmount, 0);
     
-    const todayPaid = todayOrders.filter(o => o.paymentStatus === 'paid').length;
-    const todayPending = todayOrders.filter(o => o.paymentStatus === 'pending').length;
+    const todayPaid = todayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'paid').length;
+    const todayPending = todayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'pending').length;
 
-    const yesterdayPaid = yesterdayOrders.filter(o => o.paymentStatus === 'paid').length;
-    const yesterdayPending = yesterdayOrders.filter(o => o.paymentStatus === 'pending').length;
+    const yesterdayPaid = yesterdayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'paid').length;
+    const yesterdayPending = yesterdayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'pending').length;
 
     // Calculate change percentage
     const changePercentage = yesterdayTotal > 0

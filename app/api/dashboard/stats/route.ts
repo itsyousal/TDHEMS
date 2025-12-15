@@ -129,7 +129,7 @@ export async function GET() {
             salesTrendMap.set(date, { date, orders: 0, revenue: 0 });
         }
 
-        ordersLast7Days.forEach(order => {
+        ordersLast7Days.forEach((order: { createdAt: Date; netAmount: number }) => {
             const date = format(new Date(order.createdAt), 'EEE');
             if (salesTrendMap.has(date)) {
                 const entry = salesTrendMap.get(date);
