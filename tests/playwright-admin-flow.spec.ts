@@ -74,9 +74,8 @@ test('Admin UI flow + API automation', async ({ page, request }) => {
 
   // Now use request context (re-using browser cookies) to call admin meta and API endpoints
   const cookies = await page.context().cookies();
-  const apiContext = await pwRequest.newContext({ baseURL: BASE, extraHTTPHeaders: { 'accept': 'application/json' }, storageState: undefined });
-  // set cookies in apiContext
-  await apiContext.addCookies(cookies.map(c => ({ ...c, url: BASE })));
+  const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+  const apiContext = await pwRequest.newContext({ baseURL: BASE, extraHTTPHeaders: { 'accept': 'application/json', 'cookie': cookieHeader } });
 
   // Fetch admin meta
   const metaRes = await apiContext.get('/api/admin/meta');
@@ -86,7 +85,7 @@ test('Admin UI flow + API automation', async ({ page, request }) => {
   const locationId = (meta.locations && meta.locations[0] && meta.locations[0].id) || null;
 
   // Create an order via API (3 espressos, total 300). Ensure Espresso SKU exists in meta.skus or create minimal payload with skuId
-  let espressoSkuId = meta.skus && meta.skus.find(s => /espresso/i.test(s.name))?.id;
+  let espressoSkuId = meta.skus && meta.skus.find((s: { name: string; id?: string }) => /espresso/i.test(s.name))?.id;
   if (!espressoSkuId) {
     // create via purchases endpoint as a quick SKU creation then revert (we'll just create order with sku created in next step)
     const createSkuRes = await apiContext.post('/api/purchases', { data: { orgId, locationId, items: [{ skuName: 'Espresso', quantity: 0, unitPrice: 100 }] } });

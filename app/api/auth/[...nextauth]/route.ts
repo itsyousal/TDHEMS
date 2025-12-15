@@ -3,7 +3,6 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import type { JWT } from "next-auth/jwt";
-import type { Prisma } from "@prisma/client";
 
 // Extend the built-in User type from NextAuth
 declare module "next-auth" {
@@ -32,15 +31,18 @@ declare module "next-auth/jwt" {
   }
 }
 
-type PrismaUserWithRoles = Prisma.UserGetPayload<{
-  include: {
-    userRoles: {
-      include: {
-        role: true;
-      };
-    };
-  };
-}>;
+type PrismaUserWithRoles = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  password: string | null;
+  isActive: boolean;
+  userRoles: Array<{
+    orgId: string | null;
+    role: { id: string; slug: string };
+  }>;
+};
 
 export const authOptions: NextAuthOptions = {
   providers: [
