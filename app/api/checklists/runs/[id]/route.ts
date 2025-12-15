@@ -196,7 +196,7 @@ export async function PATCH(
       if (missingPhotos.length > 0) {
         return NextResponse.json({
           error: 'Some items require photo evidence',
-          missingPhotos: missingPhotos.map((i) => ({ id: i.id, title: i.title })),
+          missingPhotos: missingPhotos.map((i: { id: string; title: string }) => ({ id: i.id, title: i.title })),
         }, { status: 400 });
       }
 
@@ -238,7 +238,7 @@ export async function PATCH(
           : 'Checklist submitted with incomplete items.',
         status: finalStatus,
         completionRate,
-        uncheckedItems: uncheckedItems.map((i) => ({ id: i.id, title: i.title })),
+        uncheckedItems: uncheckedItems.map((i: { id: string; title: string }) => ({ id: i.id, title: i.title })),
       });
     } else if (status) {
       // Direct status update (for managers)

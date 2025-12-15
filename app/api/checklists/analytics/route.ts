@@ -158,7 +158,7 @@ export async function GET(request: Request) {
         });
 
         // Get checklist names for breakdown
-        const checklistIds = checklistBreakdown.map((c) => c.checklistId);
+        const checklistIds = checklistBreakdown.map((c: { checklistId: string }) => c.checklistId);
         const checklists = await prisma.checklist.findMany({
           where: { id: { in: checklistIds } },
           select: { id: true, name: true, frequency: true },
