@@ -12,6 +12,8 @@
 # Next.js function configuration
 [functions]
   node_bundler = "esbuild"
+  external_node_modules = ["@prisma/client", "prisma"]
+  included_files = ["node_modules/.prisma/client/**"]
 
 # Rewrite API routes to Next.js serverless functions
 ## Note: No manual redirects are required for Next.js on Netlify v5.
