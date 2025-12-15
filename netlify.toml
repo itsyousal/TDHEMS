@@ -56,3 +56,6 @@
 # Next.js plugin for Netlify
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[[plugins]]
+  package = "./netlify/plugins/prisma-engine"
