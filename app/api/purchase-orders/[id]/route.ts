@@ -125,13 +125,13 @@ export async function PATCH(
       // Process inventory updates
       await prisma.$transaction(async (tx) => {
         // Default: receive all items at full quantity if no specific items provided
-        const itemsToReceive = receivedItems || purchaseOrder.items.map((item) => ({
+        const itemsToReceive = receivedItems || purchaseOrder.items.map((item: { id: string; quantity: number }) => ({
           itemId: item.id,
           receivedQuantity: item.quantity,
         }));
 
         for (const received of itemsToReceive) {
-          const poItem = purchaseOrder.items.find((i) => i.id === received.itemId);
+          const poItem = purchaseOrder.items.find((i: { id: string }) => i.id === received.itemId);
           if (!poItem) continue;
 
           const receivedQty = parseFloat(String(received.receivedQuantity || 0));

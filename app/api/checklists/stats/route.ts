@@ -145,16 +145,16 @@ export async function GET() {
     // Process today's completion stats
     const todayStats = {
       total: todayRuns.length,
-      completed: todayRuns.filter((r) => r.status === 'completed').length,
-      inProgress: todayRuns.filter((r) => r.status === 'in_progress').length,
-      failed: todayRuns.filter((r) => r.status === 'failed').length,
+      completed: todayRuns.filter((r: { status: string }) => r.status === 'completed').length,
+      inProgress: todayRuns.filter((r: { status: string }) => r.status === 'in_progress').length,
+      failed: todayRuns.filter((r: { status: string }) => r.status === 'failed').length,
     };
 
     // Calculate week completion rate
-    const weekCompletedItems = weekRuns.reduce((acc, run) => {
-      return acc + run.evidence.filter((e) => e.checked).length;
+    const weekCompletedItems = weekRuns.reduce((acc: number, run: { evidence: any[] }) => {
+      return acc + run.evidence.filter((e: { checked: boolean }) => e.checked).length;
     }, 0);
-    const weekTotalItems = weekRuns.reduce((acc, run) => {
+    const weekTotalItems = weekRuns.reduce((acc: number, run: { checklist: { _count: { items: number } } }) => {
       return acc + run.checklist._count.items;
     }, 0);
     const weekCompletionRate = weekTotalItems > 0 
@@ -163,13 +163,13 @@ export async function GET() {
 
     // Format frequency distribution
     const frequencyDistribution = {
-      daily: checklistsByFrequency.find((f) => f.frequency === 'daily')?._count || 0,
-      weekly: checklistsByFrequency.find((f) => f.frequency === 'weekly')?._count || 0,
-      monthly: checklistsByFrequency.find((f) => f.frequency === 'monthly')?._count || 0,
+      daily: checklistsByFrequency.find((f: { frequency: string; _count: number }) => f.frequency === 'daily')?._count || 0,
+      weekly: checklistsByFrequency.find((f: { frequency: string; _count: number }) => f.frequency === 'weekly')?._count || 0,
+      monthly: checklistsByFrequency.find((f: { frequency: string; _count: number }) => f.frequency === 'monthly')?._count || 0,
     };
 
     // Determine which checklists still need to be done today
-    const pendingToday = upcomingChecklists.filter((c) => c.runs.length === 0);
+    const pendingToday = upcomingChecklists.filter((c: { runs: any[] }) => c.runs.length === 0);
 
     return NextResponse.json({
       overview: {
@@ -188,16 +188,16 @@ export async function GET() {
       thisWeek: {
         totalRuns: weekRuns.length,
         completionRate: weekCompletionRate,
-        completedRuns: weekRuns.filter((r) => r.status === 'completed').length,
+        completedRuns: weekRuns.filter((r: { status: string }) => r.status === 'completed').length,
       },
       frequencyDistribution,
-      recentCompletions: recentRuns.map((run) => ({
+      recentCompletions: recentRuns.map((run: { id: string; checklist: { name: string }; user: { firstName: string | null; lastName: string | null }; completedAt: Date | null }) => ({
         id: run.id,
         checklistName: run.checklist.name,
         completedBy: `${run.user.firstName} ${run.user.lastName}`,
         completedAt: run.completedAt,
       })),
-      pendingToday: pendingToday.map((c) => ({
+      pendingToday: pendingToday.map((c: { id: string; name: string; _count: { items: number } }) => ({
         id: c.id,
         name: c.name,
         itemCount: c._count.items,

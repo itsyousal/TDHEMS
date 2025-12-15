@@ -77,10 +77,10 @@ export async function GET(request: Request) {
         limit,
         totalPages: Math.ceil(total / limit),
       },
-      categoryBreakdown: categoryBreakdown.map((c) => ({
+      categoryBreakdown: categoryBreakdown.map((c: { category: string | null; _sum: { amount: number | null } | null; _count: { id: number } }) => ({
         category: c.category,
         amount: c._sum?.amount ?? 0,
-        count: c._count ?? 0,
+        count: c._count?.id ?? 0,
       })),
     });
   } catch (error) {

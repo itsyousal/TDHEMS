@@ -33,7 +33,7 @@ export async function GET(req: Request) {
             },
         });
 
-        const formattedInventory = inventory.map((item) => ({
+        const formattedInventory = inventory.map((item: { id: string; skuId: string; locationId: string; availableQuantity: number; reservedQuantity: number; reorderLevel: number | null; sku: { code: string; name: string; inventoryType: string }; location: { name: string } }) => ({
             id: item.id,
             sku: item.sku.code,
             skuId: item.skuId,

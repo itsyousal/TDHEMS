@@ -88,9 +88,9 @@ export async function GET(request: Request) {
     ]);
 
     // Calculate completion rates
-    const runsWithProgress = runs.map((run) => {
+    const runsWithProgress = runs.map((run: { checklist: { _count: { items: number } }; evidence: any[]; [key: string]: any }) => {
       const totalItems = run.checklist._count.items;
-      const completedItems = run.evidence.filter((e) => e.checked).length;
+      const completedItems = run.evidence.filter((e: { checked: boolean }) => e.checked).length;
       const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
       return {
@@ -217,7 +217,7 @@ export async function POST(request: Request) {
       // Create evidence records for each item
       if (checklist.items.length > 0) {
         await tx.checklistEvidence.createMany({
-          data: checklist.items.map((item) => ({
+          data: checklist.items.map((item: { id: string }) => ({
             itemId: item.id,
             runId: newRun.id,
             checked: false,

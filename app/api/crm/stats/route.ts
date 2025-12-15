@@ -117,7 +117,7 @@ export async function GET() {
       gold: 0,
       platinum: 0,
     };
-    loyaltyTiers.forEach((tier) => {
+    loyaltyTiers.forEach((tier: { loyaltyTier: string; _count: { id: number } }) => {
       const tierName = tier.loyaltyTier.toLowerCase() as keyof typeof loyaltyBreakdown;
       if (tierName in loyaltyBreakdown) {
         loyaltyBreakdown[tierName] = tier._count.id;
@@ -125,7 +125,7 @@ export async function GET() {
     });
 
     // Format monthly data
-    const monthlyGrowth = customersByMonth.map((row) => ({
+    const monthlyGrowth = customersByMonth.map((row: { month: Date; count: bigint }) => ({
       month: row.month.toISOString(),
       count: Number(row.count),
     }));

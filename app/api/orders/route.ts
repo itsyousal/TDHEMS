@@ -185,7 +185,7 @@ export async function POST(request: Request) {
     const parsedDeliveryDate = deliveryDate ? new Date(deliveryDate) : null;
 
     const normalizedItems = items
-      .map((item) => {
+      .map((item: any) => {
         if (!item?.skuId || !item.quantity || !item.unitPrice) {
           return null;
         }
@@ -215,7 +215,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Items must include valid SKUs' }, { status: 400 });
     }
 
-    const computedTotal = normalizedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    const computedTotal = normalizedItems.reduce((sum: number, item: { totalPrice: number }) => sum + item.totalPrice, 0);
     const sanitizedDiscount = Math.max(0, Number(discountAmount ?? 0));
     const computedTax = Number((computedTotal * TAX_RATE).toFixed(2));
     const netAmount = Math.max(computedTotal + computedTax - sanitizedDiscount, 0);

@@ -204,12 +204,12 @@ export async function GET(request: Request) {
     ]);
 
     // Get channel names
-    const channelIds = revenueByChannel.map((r) => r.channelSourceId);
+    const channelIds = revenueByChannel.map((r: { channelSourceId: string }) => r.channelSourceId);
     const channels = await prisma.channelSource.findMany({
       where: { id: { in: channelIds } },
       select: { id: true, name: true },
     });
-    const channelMap = new Map(channels.map((c) => [c.id, c.name]));
+    const channelMap = new Map(channels.map((c: { id: string; name: string }) => [c.id, c.name]));
 
     // Calculate metrics
     const revenue = currentRevenue._sum?.netAmount ?? 0;
@@ -226,7 +226,7 @@ export async function GET(request: Request) {
     const expenseTrend = prevExpenses > 0 ? ((expenses - prevExpenses) / prevExpenses) * 100 : 0;
 
     // Format revenue by channel
-    const channelRevenue = revenueByChannel.map((item) => ({
+    const channelRevenue = revenueByChannel.map((item: { channelSourceId: string; _sum: { netAmount: number | null } | null; _count: number }) => ({
       channelId: item.channelSourceId,
       channelName: channelMap.get(item.channelSourceId) ?? 'Direct',
       revenue: item._sum?.netAmount ?? 0,
@@ -234,14 +234,14 @@ export async function GET(request: Request) {
     }));
 
     // Format expenses by category
-    const categoryExpenses = expensesByCategory.map((item) => ({
+    const categoryExpenses = expensesByCategory.map((item: { category: string | null; _sum: { amount: number | null } | null; _count: number }) => ({
       category: item.category,
       amount: item._sum?.amount ?? 0,
       count: item._count ?? 0,
     }));
 
     // Order status breakdown
-    const orderStatusBreakdown = orderCounts.map((item) => ({
+    const orderStatusBreakdown = orderCounts.map((item: { paymentStatus: string; _count: number; _sum: { netAmount: number | null } | null }) => ({
       status: item.paymentStatus,
       count: item._count ?? 0,
       amount: item._sum?.netAmount ?? 0,
@@ -291,7 +291,7 @@ export async function GET(request: Request) {
       },
 
       // Recent activity
-      recentTransactions: recentTransactions.map((t) => ({
+      recentTransactions: recentTransactions.map((t: { id: string; transactionNumber: string; type: string; category: string | null; amount: number; netAmount: number; description: string | null; transactionDate: Date; paymentStatus: string; isReconciled: boolean }) => ({
         id: t.id,
         transactionNumber: t.transactionNumber,
         type: t.type,

@@ -105,22 +105,22 @@ export async function GET(request: Request) {
     ]);
 
     // Get channel names
-    const channelIds = revenueByChannelData.map((r) => r.channelSourceId);
+    const channelIds = revenueByChannelData.map((r: { channelSourceId: string }) => r.channelSourceId);
     const channels = await prisma.channelSource.findMany({
       where: { id: { in: channelIds } },
       select: { id: true, name: true },
     });
-    const channelMap = new Map(channels.map((c) => [c.id, c.name]));
+    const channelMap = new Map(channels.map((c: { id: string; name: string }) => [c.id, c.name]));
 
     // Calculate totals
-    const paidOrders = ordersData.filter((o) => o.paymentStatus === 'paid');
-    const pendingOrders = ordersData.filter((o) => o.paymentStatus === 'pending');
+    const paidOrders = ordersData.filter((o: { paymentStatus: string }) => o.paymentStatus === 'paid');
+    const pendingOrders = ordersData.filter((o: { paymentStatus: string }) => o.paymentStatus === 'pending');
     
-    const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.netAmount || 0), 0);
-    const taxCollected = paidOrders.reduce((sum, o) => sum + (o.taxAmount || 0), 0);
-    const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0);
-    const purchaseExpenses = purchaseOrdersData.reduce((sum, po) => sum + po.totalCost, 0);
-    const refundAmount = refundsData.reduce((sum, o) => sum + (o.netAmount || 0), 0);
+    const totalRevenue = paidOrders.reduce((sum: number, o: { netAmount: number | null }) => sum + (o.netAmount || 0), 0);
+    const taxCollected = paidOrders.reduce((sum: number, o: { taxAmount: number | null }) => sum + (o.taxAmount || 0), 0);
+    const totalExpenses = expensesData.reduce((sum: number, e: { amount: number }) => sum + e.amount, 0);
+    const purchaseExpenses = purchaseOrdersData.reduce((sum: number, po: { totalCost: number }) => sum + po.totalCost, 0);
+    const refundAmount = refundsData.reduce((sum: number, o: { netAmount: number | null }) => sum + (o.netAmount || 0), 0);
 
     // Revenue by channel with names
     const revenueByChannel: Record<string, { name: string; amount: number; orderCount: number; tax: number }> = {};
@@ -192,7 +192,7 @@ export async function GET(request: Request) {
       varianceNotes: existingReconciliation?.varianceNotes ?? null,
       
       // Orders list for detail view
-      orders: ordersData.map((o) => ({
+      orders: ordersData.map((o: { id: string; orderNumber: string; channelSource: { name: string } | null; netAmount: number; taxAmount: number; paymentStatus: string; createdAt: Date }) => ({
         id: o.id,
         orderNumber: o.orderNumber,
         channel: o.channelSource?.name || 'Direct',
@@ -203,7 +203,7 @@ export async function GET(request: Request) {
       })),
       
       // Expenses list
-      expenses: expensesData.map((e) => ({
+      expenses: expensesData.map((e: { id: string; category: string | null; amount: number; description: string | null; vendor: string | null }) => ({
         id: e.id,
         category: e.category,
         amount: e.amount,
@@ -212,7 +212,7 @@ export async function GET(request: Request) {
       })),
       
       // Purchase orders
-      purchaseOrders: purchaseOrdersData.map((po) => ({
+      purchaseOrders: purchaseOrdersData.map((po: { id: string; poNumber: string; supplier: { name: string } | null; totalCost: number; receivedDate: Date | null }) => ({
         id: po.id,
         poNumber: po.poNumber,
         supplierName: po.supplier?.name || 'Direct',

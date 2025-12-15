@@ -56,7 +56,7 @@ export async function GET(
 
     // Calculate progress
     const totalItems = run.checklist.items.length;
-    const completedItems = run.evidence.filter((e) => e.checked).length;
+    const completedItems = run.evidence.filter((e: { checked: boolean }) => e.checked).length;
     const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
     return NextResponse.json({
@@ -150,7 +150,7 @@ export async function PATCH(
       }
 
       // Verify item belongs to checklist
-      const item = run.checklist.items.find((i) => i.id === itemId);
+      const item = run.checklist.items.find((i: { id: string }) => i.id === itemId);
       if (!item) {
         return NextResponse.json(
           { error: 'Item not found in this checklist' },
@@ -183,13 +183,13 @@ export async function PATCH(
       });
 
       const uncheckedItems = allItems.filter(
-        (item) => !evidence.find((e) => e.itemId === item.id && e.checked)
+        (item: { id: string }) => !evidence.find((e: { itemId: string; checked: boolean }) => e.itemId === item.id && e.checked)
       );
 
       // Check for required photos (checklist-level photo requirement)
-      const missingPhotos = requiresPhotoEvidence ? allItems.filter((item) => {
+      const missingPhotos = requiresPhotoEvidence ? allItems.filter((item: { id: string; isRequired: boolean }) => {
         if (!item.isRequired) return false;
-        const ev = evidence.find((e) => e.itemId === item.id);
+        const ev = evidence.find((e: { itemId: string; fileUrl: string | null; checked: boolean }) => e.itemId === item.id);
         return ev?.checked && !ev.fileUrl;
       }) : [];
 
@@ -201,7 +201,7 @@ export async function PATCH(
       }
 
       // Allow completion even with unchecked items but mark appropriately
-      const completedItems = evidence.filter((e) => e.checked).length;
+      const completedItems = evidence.filter((e: { checked: boolean }) => e.checked).length;
       const completionRate = allItems.length > 0 
         ? Math.round((completedItems / allItems.length) * 100) 
         : 100;
@@ -276,7 +276,7 @@ export async function PATCH(
     });
 
     const totalItems = updatedRun?.checklist.items.length || 0;
-    const completedItems = updatedRun?.evidence.filter((e) => e.checked).length || 0;
+    const completedItems = updatedRun?.evidence.filter((e: { checked: boolean }) => e.checked).length || 0;
     const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
     return NextResponse.json({

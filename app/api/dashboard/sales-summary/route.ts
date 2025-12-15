@@ -76,8 +76,8 @@ export async function GET(req: NextRequest) {
     });
 
     // Calculate totals
-    const todayTotal = todayOrders.reduce((sum, order) => sum + order.netAmount, 0);
-    const yesterdayTotal = yesterdayOrders.reduce((sum, order) => sum + order.netAmount, 0);
+    const todayTotal = todayOrders.reduce((sum: number, order: { netAmount: number }) => sum + order.netAmount, 0);
+    const yesterdayTotal = yesterdayOrders.reduce((sum: number, order: { netAmount: number }) => sum + order.netAmount, 0);
     
     const todayPaid = todayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'paid').length;
     const todayPending = todayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'pending').length;

@@ -150,7 +150,7 @@ export async function GET() {
             where: { id: { in: channelStats.map((c: { channelSourceId: string }) => c.channelSourceId) } }
         });
 
-        const totalValidOrders = channelStats.reduce((acc, curr) => acc + curr._count.id, 0);
+        const totalValidOrders = channelStats.reduce((acc: number, curr: { _count: { id: number } }) => acc + curr._count.id, 0);
         const channelBreakdown = channelStats.map((stat: { channelSourceId: string; _count: { id: number } }) => {
             const channel = channels.find((c: { id: string; slug?: string }) => c.id === stat.channelSourceId);
             return {

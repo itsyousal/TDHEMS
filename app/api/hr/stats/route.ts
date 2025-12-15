@@ -117,7 +117,7 @@ export async function GET() {
             },
         };
 
-        employees.forEach((emp) => {
+        employees.forEach((emp: { status: string; joinDate: Date | null; department: string | null; user: { id: string; userRoles?: { role?: { name: string } }[] } | null }) => {
             // Status counts
             switch (emp.status) {
                 case 'active':

@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Group by category
-    const grouped = menuItems.reduce((acc, item) => {
+    const grouped = menuItems.reduce((acc: Record<string, any[]>, item: any) => {
       const category = item.category || 'Uncategorized';
       if (!acc[category]) {
         acc[category] = [];

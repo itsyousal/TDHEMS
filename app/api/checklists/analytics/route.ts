@@ -135,20 +135,20 @@ export async function GET(request: Request) {
         let avgTime = 0;
         if (avgCompletionTime.length > 0) {
           const times = avgCompletionTime
-            .filter((r) => r.completedAt)
-            .map((r) => (new Date(r.completedAt!).getTime() - new Date(r.startedAt).getTime()) / 60000);
+            .filter((r: { completedAt: Date | null; startedAt: Date }) => r.completedAt)
+            .map((r: { completedAt: Date | null; startedAt: Date }) => (new Date(r.completedAt!).getTime() - new Date(r.startedAt).getTime()) / 60000);
           avgTime = times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0;
         }
 
         // Get user details for top performers
-        const performerIds = topPerformers.map((p) => p.userId);
+        const performerIds = topPerformers.map((p: { userId: string }) => p.userId);
         const performers = await prisma.user.findMany({
           where: { id: { in: performerIds } },
           select: { id: true, firstName: true, lastName: true, email: true },
         });
 
-        const topPerformersWithNames = topPerformers.map((p) => {
-          const user = performers.find((u) => u.id === p.userId);
+        const topPerformersWithNames = topPerformers.map((p: { userId: string; _count: { id: number } }) => {
+          const user = performers.find((u: { id: string }) => u.id === p.userId);
           return {
             userId: p.userId,
             name: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
@@ -164,8 +164,8 @@ export async function GET(request: Request) {
           select: { id: true, name: true, frequency: true },
         });
 
-        const checklistBreakdownWithNames = checklistBreakdown.map((c) => {
-          const checklist = checklists.find((ch) => ch.id === c.checklistId);
+        const checklistBreakdownWithNames = checklistBreakdown.map((c: { checklistId: string; _count: { id: number } }) => {
+          const checklist = checklists.find((ch: { id: string }) => ch.id === c.checklistId);
           return {
             checklistId: c.checklistId,
             name: checklist?.name || 'Unknown',
@@ -211,9 +211,9 @@ export async function GET(request: Request) {
         ]);
 
         // Calculate progress for each run
-        const runsWithProgress = runs.map((run) => {
+        const runsWithProgress = runs.map((run: { evidence: any[]; completedAt: Date | null; startedAt: Date; [key: string]: any }) => {
           const totalItems = run.evidence.length;
-          const checkedItems = run.evidence.filter((e) => e.checked).length;
+          const checkedItems = run.evidence.filter((e: { checked: boolean }) => e.checked).length;
           const progress = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
           
           // Calculate duration
@@ -262,7 +262,7 @@ export async function GET(request: Request) {
           _count: { id: true },
         });
 
-        const employeeIds = employeeRuns.map((e) => e.userId);
+        const employeeIds = employeeRuns.map((e: { userId: string }) => e.userId);
         
         const [employees, completedByEmployee, overdueByEmployee] = await Promise.all([
           prisma.user.findMany({
@@ -281,11 +281,11 @@ export async function GET(request: Request) {
           }),
         ]);
 
-        const performanceData = employeeIds.map((empId) => {
-          const employee = employees.find((e) => e.id === empId);
-          const totalRuns = employeeRuns.find((e) => e.userId === empId)?._count.id || 0;
-          const completed = completedByEmployee.find((e) => e.userId === empId)?._count.id || 0;
-          const overdue = overdueByEmployee.find((e) => e.userId === empId)?._count.id || 0;
+        const performanceData = employeeIds.map((empId: string) => {
+          const employee = employees.find((e: { id: string }) => e.id === empId);
+          const totalRuns = employeeRuns.find((e: { userId: string; _count: { id: number } }) => e.userId === empId)?._count.id || 0;
+          const completed = completedByEmployee.find((e: { userId: string; _count: { id: number } }) => e.userId === empId)?._count.id || 0;
+          const overdue = overdueByEmployee.find((e: { userId: string; _count: { id: number } }) => e.userId === empId)?._count.id || 0;
 
           return {
             userId: empId,
@@ -323,7 +323,7 @@ export async function GET(request: Request) {
         // Group by date
         const dailyData: Record<string, { total: number; completed: number; overdue: number }> = {};
         
-        runs.forEach((run) => {
+        runs.forEach((run: { startedAt: Date; status: string }) => {
           const dateKey = new Date(run.startedAt).toISOString().split('T')[0];
           if (!dailyData[dateKey]) {
             dailyData[dateKey] = { total: 0, completed: 0, overdue: 0 };
@@ -334,7 +334,7 @@ export async function GET(request: Request) {
         });
 
         const trends = Object.entries(dailyData)
-          .map(([date, data]) => ({
+          .map(([date, data]: [string, { total: number; completed: number; overdue: number }]) => ({
             date,
             ...data,
             completionRate: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0,

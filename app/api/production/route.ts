@@ -57,7 +57,7 @@ export async function GET() {
             take: 50
         });
 
-        const formattedBatches = batchesWithIngredients.map((batch) => {
+        const formattedBatches = batchesWithIngredients.map((batch: { ingredients: any[]; batchNumber: string; yieldQuantity: number | null; status: string; startedAt: Date | null; completedAt: Date | null; plannedDate: Date }) => {
             const productName = batch.ingredients[0]?.sku?.name || "Mixed Batch";
 
             return {
