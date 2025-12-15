@@ -46,7 +46,14 @@ async function walkDirs(rootDir, opts = {}) {
       const fullPath = path.join(current, entry.name);
 
       // Avoid walking huge trees unnecessarily
-      if (entry.name === '.git' || entry.name === '.next' || entry.name === 'node_modules') continue;
+      if (entry.name === '.git' || entry.name === '.next') continue;
+
+      // We *do* want to find node_modules directories, but we don't want
+      // to recurse into them (they can be enormous).
+      if (entry.name === 'node_modules') {
+        results.push(fullPath);
+        continue;
+      }
 
       results.push(fullPath);
       await walk(fullPath, depth + 1);
@@ -71,73 +78,84 @@ function isPrismaEngineFile(filePath) {
 
 module.exports = {
   async onPostBuild({ utils }) {
-    const repoRoot = process.cwd();
+    try {
+      const repoRoot = process.cwd();
 
-    const prismaClientDir = path.join(repoRoot, 'node_modules', '.prisma', 'client');
-    if (!(await pathExists(prismaClientDir))) {
-      utils.status.show({
-        title: 'Prisma engine copy',
-        summary: 'Skipped: node_modules/.prisma/client not found',
-      });
-      return;
-    }
+      const prismaClientDir = path.join(repoRoot, 'node_modules', '.prisma', 'client');
+      if (!(await pathExists(prismaClientDir))) {
+        utils.status.show({
+          title: 'Prisma engine copy',
+          summary: 'Skipped: node_modules/.prisma/client not found',
+        });
+        return;
+      }
 
-    const engineFiles = (await listFiles(prismaClientDir)).filter(isPrismaEngineFile);
-    if (engineFiles.length === 0) {
-      utils.status.show({
-        title: 'Prisma engine copy',
-        summary: 'Skipped: no engine files found to copy',
-      });
-      return;
-    }
+      const engineFiles = (await listFiles(prismaClientDir)).filter(isPrismaEngineFile);
+      if (engineFiles.length === 0) {
+        utils.status.show({
+          title: 'Prisma engine copy',
+          summary: 'Skipped: no engine files found to copy',
+        });
+        return;
+      }
 
-    const netlifyDir = path.join(repoRoot, '.netlify');
-    const candidateRoots = [
-      path.join(netlifyDir, 'functions'),
-      path.join(netlifyDir, 'functions-internal'),
-      path.join(netlifyDir, 'functions-serve'),
-    ];
+      const netlifyDir = path.join(repoRoot, '.netlify');
+      const candidateRoots = [
+        path.join(netlifyDir, 'functions'),
+        path.join(netlifyDir, 'functions-internal'),
+        path.join(netlifyDir, 'functions-serve'),
+      ];
 
-    const existingRoots = [];
-    for (const r of candidateRoots) {
-      if (await pathExists(r)) existingRoots.push(r);
-    }
+      const existingRoots = [];
+      for (const r of candidateRoots) {
+        if (await pathExists(r)) existingRoots.push(r);
+      }
 
-    if (existingRoots.length === 0) {
-      utils.status.show({
-        title: 'Prisma engine copy',
-        summary: 'Skipped: no .netlify/functions* directory found',
-      });
-      return;
-    }
+      if (existingRoots.length === 0) {
+        utils.status.show({
+          title: 'Prisma engine copy',
+          summary: 'Skipped: no .netlify/functions* directory found',
+        });
+        return;
+      }
 
-    let totalCopied = 0;
+      let totalCopied = 0;
+      let prismaNodeModulesFound = 0;
 
-    for (const root of existingRoots) {
-      // Walk function folders and patch any node_modules we find
-      const dirs = [root, ...(await walkDirs(root))];
-      for (const dir of dirs) {
-        if (path.basename(dir) !== 'node_modules') continue;
+      for (const root of existingRoots) {
+        // Walk function folders and patch any node_modules we find
+        const dirs = [root, ...(await walkDirs(root))];
+        for (const dir of dirs) {
+          if (path.basename(dir) !== 'node_modules') continue;
 
-        // Only patch node_modules that contain prisma deps
-        const prismaPkg = path.join(dir, 'prisma');
-        const prismaClientPkg = path.join(dir, '@prisma', 'client');
-        if (!(await pathExists(prismaPkg)) && !(await pathExists(prismaClientPkg))) continue;
+          // Only patch node_modules that contain prisma deps
+          const prismaPkg = path.join(dir, 'prisma');
+          const prismaClientPkg = path.join(dir, '@prisma', 'client');
+          if (!(await pathExists(prismaPkg)) && !(await pathExists(prismaClientPkg))) continue;
 
-        const destPrismaClientDir = path.join(dir, '.prisma', 'client');
-        await ensureDir(destPrismaClientDir);
+          prismaNodeModulesFound += 1;
 
-        for (const src of engineFiles) {
-          const dest = path.join(destPrismaClientDir, path.basename(src));
-          const copied = await copyFileIfMissing(src, dest);
-          if (copied) totalCopied += 1;
+          const destPrismaClientDir = path.join(dir, '.prisma', 'client');
+          await ensureDir(destPrismaClientDir);
+
+          for (const src of engineFiles) {
+            const dest = path.join(destPrismaClientDir, path.basename(src));
+            const copied = await copyFileIfMissing(src, dest);
+            if (copied) totalCopied += 1;
+          }
         }
       }
-    }
 
-    utils.status.show({
-      title: 'Prisma engine copy',
-      summary: `Ensured Prisma engine files in Netlify function bundles (copied ${totalCopied})`,
-    });
+      utils.status.show({
+        title: 'Prisma engine copy',
+        summary:
+          prismaNodeModulesFound === 0
+            ? 'No function node_modules with Prisma detected; nothing to patch'
+            : `Ensured Prisma engine files in Netlify function bundles (copied ${totalCopied})`,
+      });
+    } catch (error) {
+      // Fail with a clear message rather than a generic "plugin internal error"
+      utils.build.failBuild('Prisma engine copy plugin failed', { error });
+    }
   },
 };

@@ -1,7 +1,3 @@
 name: prisma-engine
 
-description: Ensures Prisma engine binaries are included in Netlify Next.js function bundles.
-
-author: Dough House
-
 inputs: []
