@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     if (locations.length > 0) {
       await prisma.inventory.createMany({
-        data: locations.map(location => ({
+        data: locations.map((location: { id: string }) => ({
           orgId: userOrg,
           locationId: location.id,
           skuId: newSku.id,
