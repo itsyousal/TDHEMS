@@ -137,7 +137,7 @@ export async function GET(request: Request) {
           const times = avgCompletionTime
             .filter((r: { completedAt: Date | null; startedAt: Date }) => r.completedAt)
             .map((r: { completedAt: Date | null; startedAt: Date }) => (new Date(r.completedAt!).getTime() - new Date(r.startedAt).getTime()) / 60000);
-          avgTime = times.length > 0 ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : 0;
+          avgTime = times.length > 0 ? Math.round(times.reduce((a: number, b: number) => a + b, 0) / times.length) : 0;
         }
 
         // Get user details for top performers
