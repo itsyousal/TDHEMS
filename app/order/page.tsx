@@ -503,7 +503,7 @@ export default function CustomerOrderPage() {
   useEffect(() => {
     const loadMeta = async () => {
       try {
-        const response = await fetch('/api/admin/meta');
+        const response = await fetch('/api/meta');
         if (!response.ok) {
           throw new Error('Unable to load store settings');
         }
