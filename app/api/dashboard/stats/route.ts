@@ -147,12 +147,12 @@ export async function GET() {
         });
 
         const channels = await prisma.channelSource.findMany({
-            where: { id: { in: channelStats.map(c => c.channelSourceId) } }
+            where: { id: { in: channelStats.map((c: { channelSourceId: string }) => c.channelSourceId) } }
         });
 
         const totalValidOrders = channelStats.reduce((acc, curr) => acc + curr._count.id, 0);
-        const channelBreakdown = channelStats.map(stat => {
-            const channel = channels.find(c => c.id === stat.channelSourceId);
+        const channelBreakdown = channelStats.map((stat: { channelSourceId: string; _count: { id: number } }) => {
+            const channel = channels.find((c: { id: string; slug?: string }) => c.id === stat.channelSourceId);
             return {
                 name: channel?.name || 'Unknown',
                 value: totalValidOrders > 0 ? Math.round((stat._count.id / totalValidOrders) * 100) : 0,
@@ -169,11 +169,11 @@ export async function GET() {
         });
 
         const skus = await prisma.sku.findMany({
-            where: { id: { in: topItems.map(i => i.skuId) } }
+            where: { id: { in: topItems.map((i: { skuId: string }) => i.skuId) } }
         });
 
-        const topProducts = topItems.map(item => {
-            const sku = skus.find(s => s.id === item.skuId);
+        const topProducts = topItems.map((item: { skuId: string; _sum: { quantity: number | null } }) => {
+            const sku = skus.find((s: { id: string; name?: string }) => s.id === item.skuId);
             return {
                 name: sku?.name || 'Unknown Item',
                 sales: item._sum.quantity || 0,
@@ -193,13 +193,13 @@ export async function GET() {
         });
 
         const activities = [
-            ...recentOrders.map(o => ({
+            ...recentOrders.map((o: { id: string; orderNumber: string; createdAt: Date; channelSource: { name: string } }) => ({
                 id: o.id,
                 type: 'order',
                 message: `Order #${o.orderNumber} from ${o.channelSource.name}`,
                 time: o.createdAt,
             })),
-            ...recentBatches.map(b => ({
+            ...recentBatches.map((b: { id: string; batchNumber: string; status: string; updatedAt: Date }) => ({
                 id: b.id,
                 type: 'batch',
                 message: `Batch ${b.batchNumber} is ${b.status.replace('_', ' ')}`,
@@ -208,7 +208,7 @@ export async function GET() {
         ]
             .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
             .slice(0, 5)
-            .map(a => ({
+            .map((a: { id: string; type: string; message: string; time: Date }) => ({
                 ...a,
                 time: formatTimeAgo(new Date(a.time))
             }));

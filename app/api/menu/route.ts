@@ -48,12 +48,12 @@ export async function GET(req: NextRequest) {
         basePrice: item.basePrice,
         description: item.description,
         image: item.image,
-        variations: item.variations.map(v => ({
+        variations: item.variations.map((v: { id: string; name: string; priceModifier: number }) => ({
           id: v.id,
           name: v.name,
           priceModifier: v.priceModifier
         })),
-        addons: item.addons.map(a => ({
+        addons: item.addons.map((a: { id: string; name: string; price: number }) => ({
           id: a.id,
           name: a.name,
           price: a.price
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     }));
 
     return NextResponse.json({
-      items: menuItems.map(item => ({
+      items: menuItems.map((item: { id: string; code: string; name: string; category: string | null; basePrice: number; description: string | null; image: string | null; variations: any; addons: any }) => ({
         id: item.id,
         code: item.code,
         name: item.name,

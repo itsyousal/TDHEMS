@@ -282,7 +282,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Check permissions
-    const roles = user.userRoles.map(ur => ur.role.slug);
+    const roles = user.userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
     const hasPermission = roles.some((role: string) => 
       ['owner-super-admin', 'general-manager'].includes(role)
     );
