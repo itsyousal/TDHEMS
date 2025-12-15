@@ -57,6 +57,11 @@ const nextConfig: NextConfig = {
       fullUrl: false,
     },
   },
+
+  // Ensure native Prisma engines are included in serverless bundles.
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/.prisma/client/**"],
+  },
 };
 
 export default nextConfig;

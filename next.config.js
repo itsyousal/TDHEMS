@@ -4,6 +4,13 @@ const nextConfig = {
   reactStrictMode: true,
   compress: true,
   poweredByHeader: false,
+
+  // Ensure native Prisma engines are included in serverless bundles.
+  // This is critical on platforms like Netlify/AWS Lambda where the engine
+  // is a native binary that must be present at runtime.
+  outputFileTracingIncludes: {
+    '/*': ['./node_modules/.prisma/client/**'],
+  },
   
   // Image optimization
   images: {
