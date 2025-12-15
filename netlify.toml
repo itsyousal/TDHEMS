@@ -11,6 +11,10 @@
 
 # Next.js function configuration
 [functions]
+  # Next.js Runtime v5 outputs serverless functions here.
+  # Setting this prevents Netlify from looking for the default `netlify/functions` folder
+  # (which doesn't exist in this repo) and ensures deploys upload the real built function bundle.
+  directory = ".netlify/functions-internal"
   node_bundler = "esbuild"
   external_node_modules = ["@prisma/client", "prisma"]
   included_files = ["node_modules/.prisma/client/**"]

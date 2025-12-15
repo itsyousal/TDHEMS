@@ -109,17 +109,6 @@ export default function LoginPage() {
               <span>{isLoading ? 'Signing in...' : 'Sign In'}</span>
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-neutral-50 border border-neutral-200 rounded-lg">
-            <p className="text-xs font-medium text-gray-600 mb-2">Demo Credentials:</p>
-            <p className="text-xs text-gray-700">
-              Email: <span className="font-mono">admin@doughhouse.local</span>
-            </p>
-            <p className="text-xs text-gray-700">
-              Password: <span className="font-mono">password123</span>
-            </p>
-          </div>
         </div>
 
         {/* Quick Access & Support */}

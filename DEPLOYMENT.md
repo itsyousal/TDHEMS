@@ -107,7 +107,7 @@ Netlify should auto-detect configuration from `netlify.toml`:
 
 - **Build command**: `npm run build`
 - **Publish directory**: `.next`
-- **Functions directory**: `netlify/functions`
+- **Functions directory**: `.netlify/functions-internal` (managed by Netlify's Next.js runtime)
 
 ### Step 3: Set Environment Variables
 
@@ -116,6 +116,7 @@ In Netlify UI (Site Settings → Build & Deploy → Environment):
 ```
 NODE_VERSION=20
 DATABASE_URL=postgresql://...
+DIRECT_URL=postgresql://...
 NEXTAUTH_SECRET=<generate with: openssl rand -base64 32>
 NEXTAUTH_URL=https://your-domain.netlify.app
 NEXT_PUBLIC_SUPABASE_URL=https://...
@@ -163,10 +164,27 @@ LOG_LEVEL="info"
 
 ```bash
 DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
 NEXT_PUBLIC_SUPABASE_URL="https://prod.supabase.co"
 NEXTAUTH_URL="https://your-domain.com"
 LOG_LEVEL="warn"
 SENTRY_DSN="https://..."
+
+## Troubleshooting
+
+### Netlify functions return 500: "Can't reach database server"
+
+Some Supabase `db.<project-ref>.supabase.co` hostnames are IPv6-only (AAAA record only). Netlify Functions commonly run in environments without IPv6 egress, which results in Prisma errors like:
+
+"Can't reach database server at `db.<ref>.supabase.co:5432`"
+
+Fix:
+
+- Use the Supabase connection pooler hostname (it resolves to IPv4) for `DATABASE_URL` (often port `6543`).
+- Keep the direct connection string for migrations/maintenance in `DIRECT_URL`.
+- Ensure the URL includes `sslmode=require`.
+
+Get the exact pooler URL from Supabase: Project Settings → Database → Connection string → Pooler (Transaction/Session).
 ```
 
 ## Database Migrations
