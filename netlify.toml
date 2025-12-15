@@ -1,6 +1,6 @@
 # Netlify deployment configuration for The Dough House system
 [build]
-  command = "npm ci --force && npm run build"
+  command = "npm ci --force && npm run prisma:generate && npm run build"
   publish = ".next"
 
 [build.environment]
