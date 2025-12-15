@@ -1,0 +1,72 @@
+﻿
+Path                                                          LineNumber Line                                                                                  
+----                                                          ---------- ----                                                                                  
+D:\Kenken\dough-house\app\api\auth\[...nextauth]\route.ts             94         const roles = user.userRoles.map((ur) => ur.role);                            
+D:\Kenken\dough-house\app\api\auth\[...nextauth]\route.ts             95         const roleNames = roles.map((role) => role.slug);                             
+D:\Kenken\dough-house\app\api\auth\[...nextauth]\route.ts            102                 roleId: { in: roles.map((role) => role.id) }                          
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          138             .filter((r) => r.completedAt)                                             
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          139             .map((r) => (new Date(r.completedAt!).getTime() - new Date(r.startedAt)...
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          144         const performerIds = topPerformers.map((p) => p.userId);                      
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          150         const topPerformersWithNames = topPerformers.map((p) => {                     
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          151           const user = performers.find((u) => u.id === p.userId);                     
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          161         const checklistIds = checklistBreakdown.map((c) => c.checklistId);            
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          167         const checklistBreakdownWithNames = checklistBreakdown.map((c) => {           
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          168           const checklist = checklists.find((ch) => ch.id === c.checklistId);         
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          214         const runsWithProgress = runs.map((run) => {                                  
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          216           const checkedItems = run.evidence.filter((e) => e.checked).length;          
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          265         const employeeIds = employeeRuns.map((e) => e.userId);                        
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          285           const employee = employees.find((e) => e.id === empId);                     
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          286           const totalRuns = employeeRuns.find((e) => e.userId === empId)?._count.id...
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          287           const completed = completedByEmployee.find((e) => e.userId === empId)?._c...
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          288           const overdue = overdueByEmployee.find((e) => e.userId === empId)?._count...
+D:\Kenken\dough-house\app\api\checklists\analytics\route.ts          326         runs.forEach((run) => {                                                       
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts           59     const completedItems = run.evidence.filter((e) => e.checked).length;              
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          153       const item = run.checklist.items.find((i) => i.id === itemId);                  
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          186         (item) => !evidence.find((e) => e.itemId === item.id && e.checked)            
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          190       const missingPhotos = requiresPhotoEvidence ? allItems.filter((item) => {       
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          192         const ev = evidence.find((e) => e.itemId === item.id);                        
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          199           missingPhotos: missingPhotos.map((i) => ({ id: i.id, title: i.title })),    
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          204       const completedItems = evidence.filter((e) => e.checked).length;                
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          241         uncheckedItems: uncheckedItems.map((i) => ({ id: i.id, title: i.title })),    
+D:\Kenken\dough-house\app\api\checklists\runs\[id]\route.ts          279     const completedItems = updatedRun?.evidence.filter((e) => e.checked).length || 0; 
+D:\Kenken\dough-house\app\api\checklists\runs\route.ts                91     const runsWithProgress = runs.map((run) => {                                      
+D:\Kenken\dough-house\app\api\checklists\runs\route.ts                93       const completedItems = run.evidence.filter((e) => e.checked).length;            
+D:\Kenken\dough-house\app\api\checklists\runs\route.ts               173       const userRoleSlugs = userRoles.map((ur) => ur.role.slug);                      
+D:\Kenken\dough-house\app\api\checklists\runs\route.ts               220           data: checklist.items.map((item) => ({                                      
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              148       completed: todayRuns.filter((r) => r.status === 'completed').length,            
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              149       inProgress: todayRuns.filter((r) => r.status === 'in_progress').length,         
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              150       failed: todayRuns.filter((r) => r.status === 'failed').length,                  
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              155       return acc + run.evidence.filter((e) => e.checked).length;                      
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              166       daily: checklistsByFrequency.find((f) => f.frequency === 'daily')?._count || 0, 
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              167       weekly: checklistsByFrequency.find((f) => f.frequency === 'weekly')?._count |...
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              168       monthly: checklistsByFrequency.find((f) => f.frequency === 'monthly')?._count...
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              172     const pendingToday = upcomingChecklists.filter((c) => c.runs.length === 0);       
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              191         completedRuns: weekRuns.filter((r) => r.status === 'completed').length,       
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              194       recentCompletions: recentRuns.map((run) => ({                                   
+D:\Kenken\dough-house\app\api\checklists\stats\route.ts              200       pendingToday: pendingToday.map((c) => ({                                        
+D:\Kenken\dough-house\app\api\checklists\[id]\route.ts                65       const userRoleSlugs = userRoles.map((ur) => ur.role.slug);                      
+D:\Kenken\dough-house\app\api\checklists\route.ts                     42     const userRoleSlugs = userRoles.map((ur) => ur.role.slug);                        
+D:\Kenken\dough-house\app\api\crm\stats\route.ts                     120     loyaltyTiers.forEach((tier) => {                                                  
+D:\Kenken\dough-house\app\api\crm\stats\route.ts                     128     const monthlyGrowth = customersByMonth.map((row) => ({                            
+D:\Kenken\dough-house\app\api\finance\expenses\route.ts               80       categoryBreakdown: categoryBreakdown.map((c) => ({                              
+D:\Kenken\dough-house\app\api\finance\reconciliation\route.ts        108     const channelIds = revenueByChannelData.map((r) => r.channelSourceId);            
+D:\Kenken\dough-house\app\api\finance\reconciliation\route.ts        113     const channelMap = new Map(channels.map((c) => [c.id, c.name]));                  
+D:\Kenken\dough-house\app\api\finance\reconciliation\route.ts        116     const paidOrders = ordersData.filter((o) => o.paymentStatus === 'paid');          
+D:\Kenken\dough-house\app\api\finance\reconciliation\route.ts        117     const pendingOrders = ordersData.filter((o) => o.paymentStatus === 'pending');    
+D:\Kenken\dough-house\app\api\finance\reconciliation\route.ts        195       orders: ordersData.map((o) => ({                                                
+D:\Kenken\dough-house\app\api\finance\reconciliation\route.ts        206       expenses: expensesData.map((e) => ({                                            
+D:\Kenken\dough-house\app\api\finance\reconciliation\route.ts        215       purchaseOrders: purchaseOrdersData.map((po) => ({                               
+D:\Kenken\dough-house\app\api\finance\stats\route.ts                 207     const channelIds = revenueByChannel.map((r) => r.channelSourceId);                
+D:\Kenken\dough-house\app\api\finance\stats\route.ts                 212     const channelMap = new Map(channels.map((c) => [c.id, c.name]));                  
+D:\Kenken\dough-house\app\api\finance\stats\route.ts                 229     const channelRevenue = revenueByChannel.map((item) => ({                          
+D:\Kenken\dough-house\app\api\finance\stats\route.ts                 237     const categoryExpenses = expensesByCategory.map((item) => ({                      
+D:\Kenken\dough-house\app\api\finance\stats\route.ts                 244     const orderStatusBreakdown = orderCounts.map((item) => ({                         
+D:\Kenken\dough-house\app\api\finance\stats\route.ts                 294       recentTransactions: recentTransactions.map((t) => ({                            
+D:\Kenken\dough-house\app\api\hr\stats\route.ts                      120         employees.forEach((emp) => {                                                  
+D:\Kenken\dough-house\app\api\inventory\route.ts                      36         const formattedInventory = inventory.map((item) => ({                         
+D:\Kenken\dough-house\app\api\orders\route.ts                        188       .map((item) => {                                                                
+D:\Kenken\dough-house\app\api\production\route.ts                     60         const formattedBatches = batchesWithIngredients.map((batch) => {              
+D:\Kenken\dough-house\app\api\purchase-orders\[id]\route.ts          128         const itemsToReceive = receivedItems || purchaseOrder.items.map((item) => ({  
+D:\Kenken\dough-house\app\api\purchase-orders\[id]\route.ts          134           const poItem = purchaseOrder.items.find((i) => i.id === received.itemId);   
+
+

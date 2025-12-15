@@ -91,15 +91,15 @@ export const authOptions: NextAuthOptions = {
         });
 
         // Return user object with roles and permissions
-        const roles = user.userRoles.map((ur) => ur.role);
-        const roleNames = roles.map((role) => role.slug);
+        const roles = user.userRoles.map((ur: { role: { id: string; slug: string } }) => ur.role);
+        const roleNames = roles.map((role: { slug: string }) => role.slug);
 
         // Fetch permissions for these roles
         const permissions = await prisma.permission.findMany({
           where: {
             rolePermissions: {
               some: {
-                roleId: { in: roles.map((role) => role.id) }
+                roleId: { in: roles.map((role: { id: string }) => role.id) }
               }
             }
           },

@@ -39,7 +39,7 @@ export async function GET(request: Request) {
       where: { userId, orgId },
       include: { role: { select: { slug: true } } },
     });
-    const userRoleSlugs = userRoles.map((ur) => ur.role.slug);
+    const userRoleSlugs = userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
 
     const where: any = { orgId };
 

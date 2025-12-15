@@ -170,7 +170,7 @@ export async function POST(request: Request) {
         where: { userId, orgId },
         include: { role: { select: { slug: true } } },
       });
-      const userRoleSlugs = userRoles.map((ur) => ur.role.slug);
+      const userRoleSlugs = userRoles.map((ur: { role: { slug: string } }) => ur.role.slug);
       
       if (!checklist.roles.some((role: string) => userRoleSlugs.includes(role))) {
         return NextResponse.json(
