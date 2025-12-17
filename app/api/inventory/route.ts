@@ -12,7 +12,15 @@ export async function GET(req: Request) {
     try {
         const url = new URL(req.url);
         const typeParam = url.searchParams.get("type");
+        const scopeParam = url.searchParams.get("scope")?.toLowerCase();
         let inventoryType: InventoryType | undefined;
+        const cookieFilter = {
+            category: {
+                contains: "cookie",
+                mode: "insensitive" as const,
+            },
+        };
+        const shouldFilterFinishedToCookies = scopeParam !== "all";
 
         if (typeParam === "raw") {
             inventoryType = InventoryType.RAW;
@@ -25,7 +33,26 @@ export async function GET(req: Request) {
                 sku: true,
                 location: true,
             },
-            where: inventoryType ? { sku: { inventoryType } } : undefined,
+            where: inventoryType
+                ? {
+                      sku: {
+                          inventoryType,
+                          ...(inventoryType === InventoryType.FINISHED && shouldFilterFinishedToCookies
+                              ? cookieFilter
+                              : {}),
+                      },
+                  }
+                : {
+                      OR: [
+                          { sku: { inventoryType: InventoryType.RAW } },
+                          {
+                              sku: {
+                                  inventoryType: InventoryType.FINISHED,
+                                  ...(shouldFilterFinishedToCookies ? cookieFilter : {}),
+                              },
+                          },
+                      ],
+                  },
             orderBy: {
                 sku: {
                     name: "asc",

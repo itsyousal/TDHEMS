@@ -81,7 +81,7 @@ export function ChangePasswordDialog({ employeeId, employeeName }: ChangePasswor
                     Change Password
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md bg-white text-gray-900">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-white text-gray-900">
                 <DialogHeader>
                     <DialogTitle>Change Password for {employeeName}</DialogTitle>
                 </DialogHeader>

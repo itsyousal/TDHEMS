@@ -123,7 +123,7 @@ export function ManagePermissionsDialog({
   if (isLoading || !data) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Permissions</DialogTitle>
             <DialogDescription>Loading user data...</DialogDescription>

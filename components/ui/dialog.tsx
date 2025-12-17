@@ -40,17 +40,15 @@ const DialogContent = React.forwardRef<
                 "fixed z-50 grid w-full gap-4 bg-white shadow-2xl duration-300",
                 // Mobile: slide up from bottom
                 "inset-x-0 bottom-0 rounded-t-2xl p-5 max-h-[90vh] overflow-y-auto",
-                // Desktop: centered modal
-                "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:p-6 sm:border sm:border-gray-200",
+                // Desktop: centered modal relative to viewport
+                "sm:inset-0 sm:m-auto sm:w-auto sm:max-w-lg sm:max-h-[90vh] sm:rounded-xl sm:p-6 sm:border sm:border-gray-200",
                 // Animations
                 "data-[state=open]:animate-in data-[state=closed]:animate-out",
                 "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                 // Mobile animation
                 "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-                // Desktop animation
+                // Desktop animation (use zoom only to avoid overriding transforms)
                 "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95",
-                "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]",
-                "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
                 className
             )}
             {...props}

@@ -86,7 +86,7 @@ type ReceiveFormState = {
 const INVENTORY_CATEGORY_OPTIONS: { value: InventoryCategoryOption; label: string; description: string }[] = [
   { value: 'all', label: 'All inventory', description: 'Raw + finished goods' },
   { value: 'raw', label: 'Raw materials', description: 'Ingredients and prep stock' },
-  { value: 'finished', label: 'Finished goods', description: 'Ready-to-ship products' },
+  { value: 'finished', label: 'Finished goods (Cookies)', description: 'Cookie SKUs only (manual availability in POS)' },
 ];
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -183,7 +183,6 @@ export default function InventoryPage() {
   });
   const [adjustStatus, setAdjustStatus] = useState<'idle' | 'submitting'>('idle');
   const [adjustNotification, setAdjustNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [reorderLoading, setReorderLoading] = useState<string | null>(null);
   const [poSupplierName, setPoSupplierName] = useState('');
   const [poSupplierContact, setPoSupplierContact] = useState('');
   const [poDeliveryDate, setPoDeliveryDate] = useState(() => new Date().toISOString().slice(0, 16));
@@ -485,30 +484,6 @@ export default function InventoryPage() {
       setAdjustNotification({ message: 'Unable to adjust inventory right now.', type: 'error' });
     } finally {
       setAdjustStatus('idle');
-    }
-  };
-
-  const handleReorder = async (item: InventoryItem) => {
-    if (reorderLoading) return;
-    setReorderLoading(item.id);
-    try {
-      const response = await fetch(`/api/inventory/${item.id}/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sku: item.sku }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Reorder request failed.');
-      }
-
-      setAdjustNotification({ message: `Reorder requested for ${item.sku}.`, type: 'success' });
-      await refreshInventory();
-    } catch (error) {
-      console.error(error);
-      setAdjustNotification({ message: 'Could not place reorder request.', type: 'error' });
-    } finally {
-      setReorderLoading(null);
     }
   };
 
@@ -834,13 +809,12 @@ export default function InventoryPage() {
                   <th className="py-3 px-3">Reserved</th>
                   <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-3">Type</th>
-                  <th className="py-3 px-3">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-gray-500">
+                    <td colSpan={7} className="py-10 text-center text-gray-500">
                       No items match your filters.
                     </td>
                   </tr>
@@ -861,16 +835,6 @@ export default function InventoryPage() {
                         <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${typeBadge(item.type)}`}>
                           {typeLabel(item.type)}
                         </span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <button
-                          type="button"
-                          onClick={() => handleReorder(item)}
-                          disabled={reorderLoading === item.id}
-                          className="inline-flex items-center gap-1 rounded-md border border-dough-brown-400 px-3 py-1 text-xs font-medium text-dough-brown-700 disabled:opacity-60"
-                        >
-                          Request replenishment
-                        </button>
                       </td>
                     </tr>
                   ))

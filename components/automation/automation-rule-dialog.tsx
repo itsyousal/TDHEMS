@@ -106,7 +106,7 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSuccess }: Au
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl md:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{rule ? 'Edit' : 'Create'} Automation Rule</DialogTitle>
         </DialogHeader>

@@ -91,7 +91,7 @@ export function AccessManagementDialog({
                     Manage Access
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md bg-white text-gray-900">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto bg-white text-gray-900">
                 <DialogHeader>
                     <DialogTitle>Manage Access for {employeeName}</DialogTitle>
                     <DialogDescription>

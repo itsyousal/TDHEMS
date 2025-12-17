@@ -10,6 +10,12 @@ export async function GET() {
     }
 
     try {
+        const cookieFilter = {
+            category: {
+                contains: "cookie",
+                mode: "insensitive" as const,
+            },
+        };
         const [
             totalSkus,
             rawSkus,
@@ -22,15 +28,45 @@ export async function GET() {
             finishedLowStockItems,
             recentMovements,
         ] = await Promise.all([
-            prisma.sku.count({ where: { isActive: true } }),
+            prisma.sku.count({
+                where: {
+                    isActive: true,
+                    OR: [
+                        { inventoryType: InventoryType.RAW },
+                        { inventoryType: InventoryType.FINISHED, ...cookieFilter },
+                    ],
+                },
+            }),
             prisma.sku.count({ where: { isActive: true, inventoryType: InventoryType.RAW } }),
-            prisma.sku.count({ where: { isActive: true, inventoryType: InventoryType.FINISHED } }),
-            prisma.inventory.count({ where: { quantity: { gt: 0 } } }),
+            prisma.sku.count({
+                where: { isActive: true, inventoryType: InventoryType.FINISHED, ...cookieFilter },
+            }),
+            prisma.inventory.count({
+                where: {
+                    quantity: { gt: 0 },
+                    OR: [
+                        { sku: { inventoryType: InventoryType.RAW } },
+                        { sku: { inventoryType: InventoryType.FINISHED, ...cookieFilter } },
+                    ],
+                },
+            }),
             prisma.inventory.count({ where: { quantity: { gt: 0 }, sku: { inventoryType: InventoryType.RAW } } }),
-            prisma.inventory.count({ where: { quantity: { gt: 0 }, sku: { inventoryType: InventoryType.FINISHED } } }),
-            prisma.inventory.count({ where: { quantity: { lte: 20 } } }),
+            prisma.inventory.count({
+                where: { quantity: { gt: 0 }, sku: { inventoryType: InventoryType.FINISHED, ...cookieFilter } },
+            }),
+            prisma.inventory.count({
+                where: {
+                    quantity: { lte: 20 },
+                    OR: [
+                        { sku: { inventoryType: InventoryType.RAW } },
+                        { sku: { inventoryType: InventoryType.FINISHED, ...cookieFilter } },
+                    ],
+                },
+            }),
             prisma.inventory.count({ where: { quantity: { lte: 20 }, sku: { inventoryType: InventoryType.RAW } } }),
-            prisma.inventory.count({ where: { quantity: { lte: 20 }, sku: { inventoryType: InventoryType.FINISHED } } }),
+            prisma.inventory.count({
+                where: { quantity: { lte: 20 }, sku: { inventoryType: InventoryType.FINISHED, ...cookieFilter } },
+            }),
             prisma.stockLedger.count({
                 where: {
                     createdAt: {

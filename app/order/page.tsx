@@ -54,6 +54,13 @@ type OrderSummary = {
   items: Array<{ skuId: string; quantity: number; unitPrice: number; totalPrice: number; notes?: string }>;
 };
 
+type CustomerSummary = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+};
+
 type MetaPayload = {
   locations: Array<{ id: string; name: string; slug: string }>;
   channelSources: Array<{ id: string; name: string }>;
@@ -73,6 +80,7 @@ type MenuAddon = {
 };
 
 type MenuItem = {
+  id: string;
   code: string;
   name: string;
   category: string;
@@ -101,55 +109,16 @@ const normalizeAddonValue = (label: string) =>
     .replace(/^-+|-+$/g, '')
     .replace(/--+/g, '-');
 
-// Step indicator component
-function StepIndicator({ currentStep, steps }: { currentStep: number; steps: string[] }) {
-  return (
-    <div className="flex items-center justify-center gap-2 mb-8">
-      {steps.map((step, index) => (
-        <React.Fragment key={step}>
-          <div className="flex items-center gap-2">
-            <div 
-              className={`
-                w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold
-                transition-all duration-300
-                ${index < currentStep 
-                  ? 'bg-green-500 text-white' 
-                  : index === currentStep 
-                    ? 'bg-dough-brown-500 text-white ring-4 ring-dough-brown-100' 
-                    : 'bg-gray-200 text-gray-500'
-                }
-              `}
-            >
-              {index < currentStep ? <CheckCircle2 className="w-4 h-4" /> : index + 1}
-            </div>
-            <span className={`text-sm font-medium hidden sm:block ${
-              index === currentStep ? 'text-gray-900' : 'text-gray-500'
-            }`}>
-              {step}
-            </span>
-          </div>
-          {index < steps.length - 1 && (
-            <ChevronRight className="w-4 h-4 text-gray-300" />
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
-}
-
 // Menu item card component
 function MenuItemCard({ 
   item, 
-  sku, 
   onAdd 
 }: { 
   item: MenuItem; 
-  sku: MetaPayload['skus'][0] | undefined;
   onAdd: (selectedAddons: MenuAddon[], variation: MenuVariation | null) => void;
 }) {
   const [selectedAddons, setSelectedAddons] = React.useState<MenuAddon[]>([]);
   const [selectedVariation, setSelectedVariation] = React.useState<MenuVariation | null>(null);
-  const canAdd = Boolean(sku);
   
   const toggleAddon = (addon: MenuAddon) => {
     setSelectedAddons(prev => 
@@ -257,18 +226,11 @@ function MenuItemCard({
         <Button
           type="button"
           onClick={handleAdd}
-          disabled={!canAdd}
           className="w-full mt-4 gap-2"
-          variant={canAdd ? "default" : "outline"}
+          variant="default"
         >
-          {canAdd ? (
-            <>
-              <Plus className="w-4 h-4" />
-              Add to Cart
-            </>
-          ) : (
-            <span className="text-gray-400">Coming Soon</span>
-          )}
+          <Plus className="w-4 h-4" />
+          Add to Cart
         </Button>
       </div>
     </div>
@@ -491,14 +453,13 @@ export default function CustomerOrderPage() {
     discount: '0',
   });
   const [customer, setCustomer] = useState({ name: '', email: '', phone: '' });
+  const [resolvedCustomerId, setResolvedCustomerId] = useState<string | null>(null);
+  const [isFetchingCustomer, setIsFetchingCustomer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [lastPlacedOrder, setLastPlacedOrder] = useState<OrderSummary | null>(null);
   const [summaryChannel, setSummaryChannel] = useState<BroadcastChannel | null>(null);
-  const [currentStep, setCurrentStep] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-
-  const steps = ['Browse Menu', 'Your Details', 'Review & Pay'];
 
   useEffect(() => {
     const loadMeta = async () => {
@@ -545,24 +506,32 @@ export default function CustomerOrderPage() {
       }
 
       const data = await response.json();
+
+      const transformMenuItem = (raw: any): MenuItem => ({
+        id: raw.id,
+        code: raw.code,
+        name: raw.name,
+        category: raw.category || 'Other',
+        basePrice: raw.basePrice,
+        description: raw.description || '',
+        variations: raw.variations || [],
+        addOns: raw.addons || [],
+      });
       
       // Transform API response to match component expectations
-      const transformedItems: MenuItem[] = data.items.map((item: any) => ({
-        code: item.code,
-        name: item.name,
-        category: item.category || 'Other',
-        basePrice: item.basePrice,
-        description: item.description || '',
-        variations: item.variations || [],
-        addOns: item.addons || [],
+      const transformedItems: MenuItem[] = (data.items || []).map(transformMenuItem);
+
+      const transformedGroups: MenuGroup[] = (data.grouped || []).map((group: any) => ({
+        category: group.category,
+        items: (group.items || []).map(transformMenuItem),
       }));
 
       setMenuItems(transformedItems);
-      setMenuGroups(data.grouped || []);
+      setMenuGroups(transformedGroups);
 
       // Set first category as active
-      if (data.grouped && data.grouped.length > 0 && !activeCategory) {
-        setActiveCategory(data.grouped[0].category);
+      if (transformedGroups.length > 0 && !activeCategory) {
+        setActiveCategory(transformedGroups[0].category);
       }
     } catch (error) {
       console.error('Failed to load menu', error);
@@ -632,25 +601,19 @@ export default function CustomerOrderPage() {
       discount: '0',
     }));
     setCustomer({ name: '', email: '', phone: '' });
-    setCurrentStep(0);
+    setResolvedCustomerId(null);
+    setActiveCategory(menuGroups[0]?.category ?? null);
   };
 
   const addMenuItemToOrder = (
-    code: string, 
-    selectedAddons: MenuAddon[] = [], 
+    menuItem: MenuItem,
+    selectedAddons: MenuAddon[] = [],
     selectedVariation: MenuVariation | null = null
   ) => {
-    const menuItem = menuItems.find((item) => item.code === code);
-    if (!menuItem) return;
-    const sku = meta.skus.find((record) => record.code === menuItem.code);
     setFormError(null);
-    if (!sku) {
-      toast.error('This item is not yet available');
-      return;
-    }
     
     // Calculate total price with variation and addons
-    let unitPrice = sku.basePrice ?? menuItem.basePrice ?? 0;
+    let unitPrice = menuItem.basePrice ?? 0;
     const addonNames: string[] = [];
     
     // Add variation price modifier
@@ -671,7 +634,7 @@ export default function CustomerOrderPage() {
     setItems((prev) => [
       ...prev,
       {
-        skuId: sku.id,
+        skuId: menuItem.id,
         quantity: '1',
         unitPrice: String(unitPrice),
         addons: addonsText,
@@ -682,6 +645,96 @@ export default function CustomerOrderPage() {
     
     const addonMsg = addonsText ? ` with ${addonsText}` : '';
     toast.success(`${menuItem.name}${addonMsg} added to cart`);
+  };
+
+  const handleFetchCustomer = async () => {
+    if (isFetchingCustomer) return;
+    setFormError(null);
+    setIsFetchingCustomer(true);
+
+    try {
+      const email = customer.email.trim();
+      const phone = customer.phone.trim();
+      const name = customer.name.trim();
+      const search = email || phone || name;
+
+      if (!search) {
+        toast.error('Enter an email, phone, or name to fetch the customer.');
+        return;
+      }
+
+      const params = new URLSearchParams({ search, limit: '1' });
+      const response = await fetch(`/api/customers?${params.toString()}`);
+
+      if (response.status === 401) {
+        toast.error('Please sign in to fetch customers.');
+        return;
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: 'Unable to fetch customer' }));
+        throw new Error(errorBody?.error || 'Unable to fetch customer');
+      }
+
+      const payload = (await response.json()) as { data?: CustomerSummary[] };
+      const found = payload.data?.[0];
+
+      if (found) {
+        setResolvedCustomerId(found.id);
+        setCustomer({
+          name: found.name || name,
+          email: found.email ?? email,
+          phone: found.phone ?? phone,
+        });
+        toast.success(`Customer found: ${found.name}`);
+        return;
+      }
+
+      // Not found: create
+      if (!name) {
+        toast.error('Customer not found. Enter a name to add a new customer.');
+        return;
+      }
+
+      toast.message('Customer not found. Adding new customer to database');
+
+      const createResponse = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email: email || undefined,
+          phone: phone || undefined,
+          segment: 'customer',
+          status: 'active',
+          loyaltyTier: 'bronze',
+        }),
+      });
+
+      if (createResponse.status === 401) {
+        toast.error('Please sign in to add customers.');
+        return;
+      }
+
+      if (!createResponse.ok) {
+        const errorBody = await createResponse.json().catch(() => ({ error: 'Unable to create customer record' }));
+        throw new Error(errorBody?.error || 'Unable to create customer record');
+      }
+
+      const created = (await createResponse.json()) as CustomerSummary;
+      setResolvedCustomerId(created.id);
+      setCustomer({
+        name: created.name || name,
+        email: created.email ?? email,
+        phone: created.phone ?? phone,
+      });
+      toast.success('Customer added to database.');
+    } catch (error) {
+      console.error('Fetch customer failed', error);
+      toast.error(error instanceof Error ? error.message : 'Unable to fetch customer');
+    } finally {
+      setIsFetchingCustomer(false);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -717,25 +770,31 @@ export default function CustomerOrderPage() {
 
     setIsSaving(true);
     try {
-      let customerId: string | undefined;
+      let customerId: string | undefined = resolvedCustomerId ?? undefined;
       const contactSearch = (customer.email || customer.phone)?.trim();
 
-      if (contactSearch) {
+      if (!customerId && contactSearch) {
         const params = new URLSearchParams({ search: contactSearch, limit: '1' });
         const searchResponse = await fetch(`/api/customers?${params.toString()}`);
         if (searchResponse.ok) {
           const payload = await searchResponse.json();
           if (payload.data?.length) {
             customerId = payload.data[0].id;
+            setResolvedCustomerId(payload.data[0].id);
+            toast.success(`Customer found: ${payload.data[0].name || trimmedName}`);
           }
         }
       }
 
       if (!customerId) {
+        toast.message('Customer not found. Adding new customer to database');
         const customerPayload = {
           name: trimmedName,
           email: customer.email.trim() || undefined,
           phone: customer.phone.trim() || undefined,
+          segment: 'customer',
+          status: 'active',
+          loyaltyTier: 'bronze',
         };
         const createdCustomer = await fetch('/api/customers', {
           method: 'POST',
@@ -749,6 +808,8 @@ export default function CustomerOrderPage() {
         }
         const customerBody = await createdCustomer.json();
         customerId = customerBody.id;
+        setResolvedCustomerId(customerBody.id);
+        toast.success('Customer added to database.');
       }
 
       const orderPayload = {
@@ -845,10 +906,9 @@ export default function CustomerOrderPage() {
             
             {/* Cart indicator */}
             {items.length > 0 && (
-              <button
-                onClick={() => setCurrentStep(2)}
+              <div
                 className="relative flex items-center gap-2 bg-gray-900 text-white 
-                           px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors"
+                           px-4 py-2.5 rounded-lg"
               >
                 <ShoppingCart className="w-4 h-4" />
                 <span className="font-semibold">{formatCurrency(netAmount)}</span>
@@ -856,7 +916,7 @@ export default function CustomerOrderPage() {
                                  text-xs flex items-center justify-center font-bold">
                   {items.length}
                 </span>
-              </button>
+              </div>
             )}
           </div>
         </div>
@@ -873,226 +933,123 @@ export default function CustomerOrderPage() {
           </div>
         )}
 
-        {/* Step indicator */}
-        <StepIndicator currentStep={currentStep} steps={steps} />
-
-        {/* Step 0: Browse Menu */}
-        {currentStep === 0 && (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            {/* Loading state */}
-            {menuLoading && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <Loader2 className="w-12 h-12 text-gray-400 animate-spin mb-4" />
-                <p className="text-gray-500 text-lg">Loading menu...</p>
-              </div>
-            )}
-
-            {/* Error state */}
-            {menuError && !menuLoading && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                <p className="text-red-900 font-semibold mb-2">Failed to load menu</p>
-                <p className="text-red-700 text-sm">{menuError}</p>
-                <Button
-                  onClick={() => window.location.reload()}
-                  className="mt-4"
-                  variant="outline"
-                >
-                  Retry
-                </Button>
-              </div>
-            )}
-
-            {/* Menu content */}
-            {!menuLoading && !menuError && menuGroups.length > 0 && (
-              <>
-                {/* Category tabs */}
-                <div className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
-                  {menuGroups.map((group) => (
-                    <button
-                      key={group.category}
-                      onClick={() => setActiveCategory(group.category)}
-                      className={`
-                        px-5 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all border
-                        ${activeCategory === group.category
-                          ? 'bg-gray-900 text-white border-gray-900'
-                          : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'
-                        }
-                      `}
-                    >
-                      {group.category}
-                    </button>
-                  ))}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left: Catalog */}
+          <section className="lg:col-span-8">
+            <div className="bg-white rounded-lg border border-gray-300 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
+                  <p className="text-sm text-gray-500">Tap an item to add it to the cart</p>
                 </div>
-
-                {/* Menu grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {menuGroups
-                    .find((g) => g.category === activeCategory)
-                    ?.items.map((item) => {
-                      const sku = meta.skus.find((s) => s.code === item.code);
-                      return (
-                        <MenuItemCard
-                          key={item.code}
-                          item={item}
-                          sku={sku}
-                          onAdd={(selectedAddons, variation) => 
-                            addMenuItemToOrder(item.code, selectedAddons, variation)
-                          }
-                        />
-                      );
-                    })}
-                </div>
-              </>
-            )}
-
-            {/* Empty state */}
-            {!menuLoading && !menuError && menuGroups.length === 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-16 text-center">
-                <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-900 font-semibold text-lg mb-2">No menu items available</p>
-                <p className="text-gray-600">Please check back later or contact us</p>
+                {items.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Badge variant="secondary">{items.length} item{items.length !== 1 ? 's' : ''}</Badge>
+                    <span className="font-semibold text-gray-900">{formatCurrency(netAmount)}</span>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Continue button */}
-            {items.length > 0 && (
-              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-300 p-4 
-                              shadow-lg md:relative md:shadow-none md:bg-transparent md:border-0 md:mt-8">
-                <div className="max-w-lg mx-auto">
-                  <Button
-                    onClick={() => setCurrentStep(1)}
-                    className="w-full h-12 gap-2 text-base bg-gray-900 hover:bg-gray-800 text-white"
-                  >
-                    Continue
-                    <span className="bg-white/20 px-2 py-0.5 rounded-full text-sm">
-                      {items.length} item{items.length > 1 ? 's' : ''} • {formatCurrency(netAmount)}
-                    </span>
-                    <ChevronRight className="w-4 h-4" />
+              {/* Loading state */}
+              {menuLoading && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Loader2 className="w-12 h-12 text-gray-400 animate-spin mb-4" />
+                  <p className="text-gray-500 text-lg">Loading menu...</p>
+                </div>
+              )}
+
+              {/* Error state */}
+              {menuError && !menuLoading && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                  <p className="text-red-900 font-semibold mb-2">Failed to load menu</p>
+                  <p className="text-red-700 text-sm">{menuError}</p>
+                  <Button onClick={() => window.location.reload()} className="mt-4" variant="outline">
+                    Retry
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
 
-        {/* Step 1: Customer Details */}
-        {currentStep === 1 && (
-          <div className="max-w-xl mx-auto animate-in fade-in slide-in-from-right-4 duration-300">
-            <button
-              onClick={() => setCurrentStep(0)}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors font-medium"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to menu
-            </button>
-
-            <div className="bg-white rounded-lg border border-gray-300 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <User className="w-5 h-5 text-gray-900" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-gray-900">Your Details</h2>
-                  <p className="text-sm text-gray-500">We'll use this to keep you updated</p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    placeholder="Enter your name"
-                    value={customer.name}
-                    onChange={(e) => setCustomer((prev) => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                    <Input
-                      type="email"
-                      placeholder="your@email.com"
-                      value={customer.email}
-                      onChange={(e) => setCustomer((prev) => ({ ...prev, email: e.target.value }))}
-                    />
+              {/* Menu content */}
+              {!menuLoading && !menuError && menuGroups.length > 0 && (
+                <>
+                  <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
+                    {menuGroups.map((group) => (
+                      <button
+                        key={group.category}
+                        onClick={() => setActiveCategory(group.category)}
+                        className={`
+                          px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all border
+                          ${activeCategory === group.category
+                            ? 'bg-gray-900 text-white border-gray-900'
+                            : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'
+                          }
+                        `}
+                      >
+                        {group.category}
+                      </button>
+                    ))}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
-                    <Input
-                      type="tel"
-                      placeholder="+91 98765 43210"
-                      value={customer.phone}
-                      onChange={(e) => setCustomer((prev) => ({ ...prev, phone: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <Button
-                onClick={() => setCurrentStep(2)}
-                className="w-full mt-6 h-12 gap-2"
-              >
-                Review Order
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {menuGroups
+                      .find((g) => g.category === activeCategory)
+                      ?.items.map((item) => {
+                        return (
+                          <MenuItemCard
+                            key={item.code}
+                            item={item}
+                            onAdd={(selectedAddons, variation) =>
+                              addMenuItemToOrder(item, selectedAddons, variation)
+                            }
+                          />
+                        );
+                      })}
+                  </div>
+                </>
+              )}
+
+              {/* Empty state */}
+              {!menuLoading && !menuError && menuGroups.length === 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-16 text-center">
+                  <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-900 font-semibold text-lg mb-2">No menu items available</p>
+                  <p className="text-gray-600">Please check back later or contact us</p>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          </section>
 
-        {/* Step 2: Review & Pay */}
-        {currentStep === 2 && (
-          <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-right-4 duration-300">
-            <button
-              onClick={() => setCurrentStep(1)}
-              className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to details
-            </button>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Cart items */}
-              <div className="bg-white rounded-lg border border-gray-300 p-6">
-                <div className="flex items-center justify-between mb-4">
+          {/* Right: Cart + Checkout */}
+          <aside className="lg:col-span-4">
+            <form onSubmit={handleSubmit} className="lg:sticky lg:top-24 space-y-4">
+              <div className="bg-white rounded-lg border border-gray-300 p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3 mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
                       <ShoppingCart className="w-5 h-5 text-gray-900" />
                     </div>
                     <div>
-                      <h2 className="font-semibold text-gray-900">Your Cart</h2>
+                      <h2 className="font-semibold text-gray-900">Cart</h2>
                       <p className="text-sm text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''}</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep(0)}
-                    className="text-sm text-gray-700 hover:text-gray-900 font-medium underline"
-                  >
-                    + Add more
-                  </button>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">Total</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(netAmount)}</p>
+                  </div>
                 </div>
 
                 {items.length === 0 ? (
-                  <div className="text-center py-8">
+                  <div className="text-center py-10">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                       <ShoppingCart className="w-8 h-8 text-gray-400" />
                     </div>
-                    <p className="text-gray-500">Your cart is empty</p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setCurrentStep(0)}
-                      className="mt-4"
-                    >
-                      Browse Menu
-                    </Button>
+                    <p className="text-gray-600">Your cart is empty</p>
+                    <p className="text-xs text-gray-500 mt-1">Add items from the menu to start</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-[45vh] overflow-auto pr-1">
                     {items.map((item, index) => {
                       const sku = meta.skus.find((s) => s.id === item.skuId);
                       return (
@@ -1109,13 +1066,93 @@ export default function CustomerOrderPage() {
                 )}
               </div>
 
-              {/* Order summary */}
-              <div className="bg-white rounded-lg border border-gray-300 p-6">
+              <div className="bg-white rounded-lg border border-gray-300 p-4 sm:p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <User className="w-5 h-5 text-gray-900" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Customer</h3>
+                    <p className="text-sm text-gray-500">Required for placing the order</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      placeholder="Enter your name"
+                      value={customer.name}
+                      onChange={(e) => {
+                        setResolvedCustomerId(null);
+                        setCustomer((prev) => ({ ...prev, name: e.target.value }));
+                      }}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                      <Input
+                        type="email"
+                        placeholder="your@email.com"
+                        value={customer.email}
+                        onChange={(e) => {
+                          setResolvedCustomerId(null);
+                          setCustomer((prev) => ({ ...prev, email: e.target.value }));
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
+                      <Input
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        value={customer.phone}
+                        onChange={(e) => {
+                          setResolvedCustomerId(null);
+                          setCustomer((prev) => ({ ...prev, phone: e.target.value }));
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleFetchCustomer}
+                      disabled={isFetchingCustomer}
+                      className="gap-2"
+                    >
+                      {isFetchingCustomer ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Fetching...
+                        </>
+                      ) : (
+                        <>
+                          <User className="w-4 h-4" />
+                          Fetch Customer
+                        </>
+                      )}
+                    </Button>
+
+                    {resolvedCustomerId && (
+                      <Badge variant="secondary">Customer linked</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg border border-gray-300 p-4 sm:p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
                     <CreditCard className="w-5 h-5 text-gray-900" />
                   </div>
-                  <h3 className="font-semibold text-gray-900">Order Summary</h3>
+                  <h3 className="font-semibold text-gray-900">Summary</h3>
                 </div>
 
                 <div className="space-y-3">
@@ -1147,15 +1184,12 @@ export default function CustomerOrderPage() {
                 </p>
               </div>
 
-              {/* Error message */}
               {formError && (
-                <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-red-600 text-sm
-                                animate-in fade-in shake">
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-red-600 text-sm animate-in fade-in shake">
                   {formError}
                 </div>
               )}
 
-              {/* Submit button */}
               <Button
                 type="submit"
                 disabled={isSaving || items.length === 0}
@@ -1178,8 +1212,8 @@ export default function CustomerOrderPage() {
                 By placing your order, you agree to our terms and conditions
               </p>
             </form>
-          </div>
-        )}
+          </aside>
+        </div>
       </main>
     </div>
   );
