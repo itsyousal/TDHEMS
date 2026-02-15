@@ -92,7 +92,8 @@ const nextConfig: NextConfig = {
 
   // Ensure native Prisma engines are included in serverless bundles.
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/.prisma/client/**", "./node_modules/@prisma/client/**"],
+    "/api/**/*": ["./node_modules/.prisma/client/**/*", "./node_modules/@prisma/client/**/*"],
+    "/**/*": ["./node_modules/.prisma/client/**/*", "./node_modules/@prisma/client/**/*"],
   },
 };
 
