@@ -5,6 +5,11 @@ import { ShoppingCart, DollarSign, Truck, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+});
+
 type OrderSummary = {
   id: string;
   orderNumber: string;
@@ -109,34 +114,33 @@ export default function OrdersPage() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Order ID</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Customer</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Channel</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Total</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Date</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Actions</th>
-                </tr>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Order ID</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Customer</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Channel</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Total</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Status</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Date</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-gray-700">Actions</th>
+              </tr>
             </thead>
             <tbody>
-                {orders.map((order) => (
+              {orders.map((order) => (
                 <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4 text-sm font-medium text-gray-900">{order.orderNumber}</td>
                   <td className="py-3 px-4 text-sm text-gray-600">{order.customer?.name || 'Guest'}</td>
                   <td className="py-3 px-4 text-sm text-gray-600">{order.channelSource?.name || 'Direct'}</td>
-                  <td className="py-3 px-4 text-sm text-gray-900 font-medium">Rs.{order.netAmount.toFixed(2)}</td>
+                  <td className="py-3 px-4 text-sm text-gray-900 font-medium">{currencyFormatter.format(order.netAmount)}</td>
                   <td className="py-3 px-4 text-sm">
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        order.status === 'delivered'
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered'
                           ? 'bg-green-100 text-green-800'
                           : order.status === 'shipped'
                             ? 'bg-blue-100 text-blue-800'
                             : order.status === 'pending'
                               ? 'bg-yellow-100 text-yellow-800'
                               : 'bg-gray-100 text-gray-800'
-                      }`}
+                        }`}
                     >
                       {order.status}
                     </span>
@@ -198,7 +202,7 @@ export default function OrdersPage() {
                         <tr key={`${printingOrder.id}-${item.id}`}>
                           <td>{item.sku?.name || item.id}</td>
                           <td className="text-right">{item.quantity}</td>
-                          <td className="text-right">Rs.{item.totalPrice.toFixed(2)}</td>
+                          <td className="text-right">{currencyFormatter.format(item.totalPrice)}</td>
                         </tr>
                       ))
                     ) : (
@@ -213,7 +217,7 @@ export default function OrdersPage() {
                 <div className="space-y-1">
                   <div className="flex justify-between">
                     <span>Payable amount</span>
-                    <span className="font-semibold">Rs.{printingOrder.netAmount.toFixed(2)}</span>
+                    <span className="font-semibold">{currencyFormatter.format(printingOrder.netAmount)}</span>
                   </div>
                 </div>
                 <p className="text-xs mt-4">Hope to serve you again!</p>

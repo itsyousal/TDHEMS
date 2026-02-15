@@ -68,7 +68,7 @@ export default function MenuManagementPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('finished');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -77,8 +77,8 @@ export default function MenuManagementPage() {
 
   // Check if user is admin or manager
   const sessionRoles: string[] = (session?.user as any)?.roles || [];
-  const isAdminOrManager = sessionRoles.includes('owner-super-admin') || 
-                           sessionRoles.includes('general-manager');
+  const isAdminOrManager = sessionRoles.includes('owner-super-admin') ||
+    sessionRoles.includes('general-manager');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -104,7 +104,7 @@ export default function MenuManagementPage() {
     try {
       setIsLoading(true);
       const response = await fetch('/api/admin/menu');
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch menu items');
       }
@@ -251,10 +251,13 @@ export default function MenuManagementPage() {
     }
   };
 
-  const categories = Array.from(new Set(menuItems.map(item => item.category).filter(Boolean)));
-  const totalItems = menuItems.length;
-  const activeItems = menuItems.filter(item => item.status === 'active').length;
-  const totalValue = menuItems.reduce((sum, item) => sum + item.basePrice, 0);
+  // Calculate stats only for Finished goods (Menu Items)
+  const menuStatsItems = menuItems.filter(item => item.inventoryType === 'FINISHED');
+
+  const categories = Array.from(new Set(menuStatsItems.map(item => item.category).filter(Boolean)));
+  const totalItems = menuStatsItems.length;
+  const activeItems = menuStatsItems.filter(item => item.status === 'active').length;
+  const totalValue = menuStatsItems.reduce((sum, item) => sum + item.basePrice, 0);
   const avgPrice = totalItems > 0 ? totalValue / totalItems : 0;
 
   if (status === 'loading' || isLoading) {
@@ -273,7 +276,7 @@ export default function MenuManagementPage() {
           <h1 className="text-3xl font-bold text-gray-900">Menu Management</h1>
           <p className="text-gray-600 mt-1">Manage your menu items and products</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsAddDialogOpen(true)}
           className="bg-gray-900 hover:bg-gray-800 text-white"
         >
@@ -283,7 +286,7 @@ export default function MenuManagementPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -316,18 +319,6 @@ export default function MenuManagementPage() {
             </div>
             <div className="p-3 bg-purple-50 rounded-lg">
               <DollarSign className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Categories</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{categories.length}</p>
-            </div>
-            <div className="p-3 bg-orange-50 rounded-lg">
-              <Tag className="w-6 h-6 text-orange-600" />
             </div>
           </div>
         </div>
@@ -386,9 +377,6 @@ export default function MenuManagementPage() {
                   Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Price
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -424,11 +412,6 @@ export default function MenuManagementPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant="outline" className="text-xs">
-                        {item.category || 'Uncategorized'}
-                      </Badge>
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       ₹{item.basePrice.toFixed(2)}
                     </td>
@@ -444,18 +427,18 @@ export default function MenuManagementPage() {
                             {item.addons.length} addon{item.addons.length !== 1 ? 's' : ''}
                           </Badge>
                         )}
-                        {(!item.variations || item.variations.length === 0) && 
-                         (!item.addons || item.addons.length === 0) && (
-                          <span className="text-xs text-gray-400">None</span>
-                        )}
+                        {(!item.variations || item.variations.length === 0) &&
+                          (!item.addons || item.addons.length === 0) && (
+                            <span className="text-xs text-gray-400">None</span>
+                          )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge
                         variant={
-                          item.status === 'active' ? 'default' : 
-                          item.status === 'inactive' ? 'secondary' : 
-                          'destructive'
+                          item.status === 'active' ? 'default' :
+                            item.status === 'inactive' ? 'secondary' :
+                              'destructive'
                         }
                         className="text-xs"
                       >
@@ -509,7 +492,7 @@ export default function MenuManagementPage() {
       </div>
 
       {/* Add Product Dialog */}
-      <AddProductDialog 
+      <AddProductDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         onSuccess={() => {

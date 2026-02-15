@@ -25,9 +25,21 @@ export async function POST(request: NextRequest) {
     const orgId = session.user.organizationId;
 
     // Prevent duplicate SKU codes within org
-    const existing = await prisma.sku.findFirst({ where: { orgId, code } });
+    const existing = await prisma.sku.findFirst({
+      where: {
+        orgId,
+        code: { equals: code.trim(), mode: 'insensitive' } // Case-insensitive check
+      }
+    });
+
     if (existing) {
-      return jsonErrorResponse(ERROR_CODES.CONFLICT, 'SKU code already exists', 409, { field: 'code' });
+      const status = existing.isActive ? 'active' : 'archived/inactive';
+      return jsonErrorResponse(
+        ERROR_CODES.CONFLICT,
+        `SKU code '${code.trim()}' already exists (${status}). Please use a different code or restore the existing one.`,
+        409,
+        { field: 'code', existingId: existing.id }
+      );
     }
 
     // Map category to InventoryType

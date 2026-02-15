@@ -20,7 +20,8 @@ export async function GET(req: Request) {
                 mode: "insensitive" as const,
             },
         };
-        const shouldFilterFinishedToCookies = scopeParam !== "all";
+        // Default to showing all finished goods unless specifically filtered to cookies
+        const shouldFilterFinishedToCookies = scopeParam === "cookies";
 
         if (typeParam === "raw") {
             inventoryType = InventoryType.RAW;
@@ -40,24 +41,24 @@ export async function GET(req: Request) {
             },
             where: inventoryType
                 ? {
-                      sku: {
-                          inventoryType,
-                          ...(inventoryType === InventoryType.FINISHED && shouldFilterFinishedToCookies
-                              ? cookieFilter
-                              : {}),
-                      },
-                  }
+                    sku: {
+                        inventoryType,
+                        ...(inventoryType === InventoryType.FINISHED && shouldFilterFinishedToCookies
+                            ? cookieFilter
+                            : {}),
+                    },
+                }
                 : {
-                      OR: [
-                          { sku: { inventoryType: InventoryType.RAW } },
-                          {
-                              sku: {
-                                  inventoryType: InventoryType.FINISHED,
-                                  ...(shouldFilterFinishedToCookies ? cookieFilter : {}),
-                              },
-                          },
-                      ],
-                  },
+                    OR: [
+                        { sku: { inventoryType: InventoryType.RAW } },
+                        {
+                            sku: {
+                                inventoryType: InventoryType.FINISHED,
+                                ...(shouldFilterFinishedToCookies ? cookieFilter : {}),
+                            },
+                        },
+                    ],
+                },
             orderBy: {
                 sku: {
                     name: "asc",

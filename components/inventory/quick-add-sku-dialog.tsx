@@ -18,7 +18,7 @@ interface QuickAddSKUDialogProps {
 export function QuickAddSKUDialog({ open, onClose, onSKUCreated, locationId }: QuickAddSKUDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -57,12 +57,14 @@ export function QuickAddSKUDialog({ open, onClose, onSKUCreated, locationId }: Q
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create SKU');
+        // Helper to extract message from potentially nested error object
+        const errorMessage = errorData.error?.message || errorData.error || 'Failed to create SKU';
+        throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
       }
 
       const data = await response.json();
       onSKUCreated(data.sku);
-      
+
       // Reset form
       setFormData({
         code: '',
@@ -71,7 +73,7 @@ export function QuickAddSKUDialog({ open, onClose, onSKUCreated, locationId }: Q
         basePrice: '',
         category: 'raw',
       });
-      
+
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to create SKU');
@@ -205,7 +207,7 @@ export function QuickAddSKUDialog({ open, onClose, onSKUCreated, locationId }: Q
               ) : (
                 <>
                   <PlusCircle className="mr-2 h-4 w-4" />
-                  Create & Add to PO
+                  Create SKU
                 </>
               )}
             </Button>

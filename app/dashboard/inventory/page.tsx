@@ -89,9 +89,9 @@ const INVENTORY_CATEGORY_OPTIONS: { value: InventoryCategoryOption; label: strin
   { value: 'finished', label: 'Finished goods (Cookies)', description: 'Cookie SKUs only (manual availability in POS)' },
 ];
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
-  currency: 'USD',
+  currency: 'INR',
   maximumFractionDigits: 2,
 });
 
@@ -134,9 +134,8 @@ const TypeBreakdownCard = ({
   highlight?: boolean;
 }) => (
   <div
-    className={`rounded-lg border bg-white p-5 shadow-sm transition ${
-      highlight ? 'border-dough-brown-300 shadow-md' : 'border-gray-200'
-    }`}
+    className={`rounded-lg border bg-white p-5 shadow-sm transition ${highlight ? 'border-dough-brown-300 shadow-md' : 'border-gray-200'
+      }`}
   >
     <div className="flex items-center justify-between gap-3">
       <div>
@@ -285,6 +284,38 @@ export default function InventoryPage() {
     });
   }, [items, searchTerm, locationFilter, statusFilter]);
 
+  const [sortConfig, setSortConfig] = useState<{ key: keyof InventoryItem; direction: 'asc' | 'desc' }>({
+    key: 'sku',
+    direction: 'asc',
+  });
+
+  const handleSort = (key: keyof InventoryItem) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const sortedItems = useMemo(() => {
+    const sorted = [...filteredItems];
+    sorted.sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      const aString = String(aValue).toLowerCase();
+      const bString = String(bValue).toLowerCase();
+
+      if (aString < bString) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aString > bString) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [filteredItems, sortConfig]);
+
   const rawSkuOptions = useMemo(() => {
     const map = new Map<string, { skuId: string; label: string }>();
     items
@@ -315,10 +346,10 @@ export default function InventoryPage() {
   const handleQuickSKUCreated = async (newSku: any) => {
     // Refresh SKU data to include the new SKU
     await refreshInventory();
-    
+
     // Add a new row with the newly created SKU pre-selected
     setPoItems((prev) => [...prev, { skuId: newSku.id, quantity: '', unitCost: newSku.basePrice?.toString() || '' }]);
-    
+
     // Show success notification
     setPoNotification({ message: `SKU "${newSku.name}" created and added to purchase order.`, type: 'success' });
   };
@@ -541,9 +572,9 @@ export default function InventoryPage() {
 
     const itemsHtml = 'items' in printData
       ? (printData as { items: { sku: string; quantity: string; unitCost: string; lineTotal: number }[] }).items
-          .filter((item) => item.sku)
-          .map(
-            (item) => `
+        .filter((item) => item.sku)
+        .map(
+          (item) => `
             <tr>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${item.sku}</td>
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.quantity}</td>
@@ -551,8 +582,8 @@ export default function InventoryPage() {
               <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${currencyFormatter.format(item.lineTotal)}</td>
             </tr>
           `
-          )
-          .join('')
+        )
+        .join('')
       : '';
 
     printWindow.document.write(`
@@ -739,11 +770,10 @@ export default function InventoryPage() {
             key={option.value}
             type="button"
             onClick={() => setInventoryCategory(option.value)}
-            className={`inline-flex flex-col gap-1 rounded-full border px-4 py-1 transition ${
-              inventoryCategory === option.value
-                ? 'border-dough-brown-500 bg-dough-brown-50 text-dough-brown-700'
-                : 'border-gray-200 bg-white text-gray-600 hover:border-dough-brown-400'
-            }`}
+            className={`inline-flex flex-col gap-1 rounded-full border px-4 py-1 transition ${inventoryCategory === option.value
+              ? 'border-dough-brown-500 bg-dough-brown-50 text-dough-brown-700'
+              : 'border-gray-200 bg-white text-gray-600 hover:border-dough-brown-400'
+              }`}
           >
             <span className="text-[10px] font-semibold tracking-wider">{option.label}</span>
             <span className="text-[10px] font-normal uppercase tracking-widest text-gray-400">{option.description}</span>
@@ -829,39 +859,63 @@ export default function InventoryPage() {
 
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-gray-500">
+              <thead className="text-xs uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="py-3 px-3">SKU</th>
-                  <th className="py-3 px-3">Description</th>
-                  <th className="py-3 px-3">Location</th>
-                  <th className="py-3 px-3">Avail</th>
-                  <th className="py-3 px-3">Reserved</th>
-                  <th className="py-3 px-3">Status</th>
-                  <th className="py-3 px-3">Type</th>
+                  {[
+                    { key: 'sku', label: 'SKU' },
+                    { key: 'desc', label: 'Description' },
+                    { key: 'loc', label: 'Location' },
+                    { key: 'avail', label: 'Avail', numeric: true },
+                    { key: 'res', label: 'Reserved', numeric: true },
+                    { key: 'status', label: 'Status' },
+                    { key: 'type', label: 'Type' },
+                  ].map((column) => (
+                    <th
+                      key={column.key}
+                      className={`py-3 px-3 cursor-pointer transition hover:bg-gray-100 ${column.numeric ? 'text-right' : ''}`}
+                      onClick={() => handleSort(column.key as keyof InventoryItem)}
+                    >
+                      <div className={`flex items-center gap-1 ${column.numeric ? 'justify-end' : ''}`}>
+                        {column.label}
+                        {sortConfig.key === column.key ? (
+                          sortConfig.direction === 'asc' ? (
+                            <ArrowUpDown className="h-3 w-3 text-dough-brown-600 rotate-180" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-dough-brown-600" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 text-gray-300" />
+                        )}
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody>
-                {filteredItems.length === 0 ? (
+              <tbody className="divide-y divide-gray-100">
+                {sortedItems.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-10 text-center text-gray-500">
-                      No items match your filters.
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Search className="h-8 w-8 text-gray-300" />
+                        <p>No items match your filters.</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item) => (
-                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  sortedItems.map((item) => (
+                    <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-3 font-medium text-gray-900">{item.sku}</td>
                       <td className="py-3 px-3 text-gray-600">{item.desc}</td>
                       <td className="py-3 px-3 text-gray-600">{item.loc}</td>
-                      <td className="py-3 px-3 text-gray-900">{item.avail}</td>
-                      <td className="py-3 px-3 text-gray-600">{item.res}</td>
+                      <td className="py-3 px-3 text-right text-gray-900 font-medium">{item.avail}</td>
+                      <td className="py-3 px-3 text-right text-gray-600">{item.res}</td>
                       <td className="py-3 px-3">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadge(item.status)}`}>
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadge(item.status)}`}>
                           {item.status}
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${typeBadge(item.type)}`}>
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${typeBadge(item.type)}`}>
                           {typeLabel(item.type)}
                         </span>
                       </td>
@@ -944,11 +998,10 @@ export default function InventoryPage() {
             <div
               role="status"
               aria-live="polite"
-              className={`rounded-md px-3 py-2 text-xs ${
-                adjustNotification.type === 'success'
-                  ? 'bg-green-50 text-green-700 border border-green-100'
-                  : 'bg-red-50 text-red-700 border border-red-100'
-              }`}
+              className={`rounded-md px-3 py-2 text-xs ${adjustNotification.type === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-100'
+                : 'bg-red-50 text-red-700 border border-red-100'
+                }`}
             >
               {adjustNotification.message}
             </div>
@@ -957,11 +1010,10 @@ export default function InventoryPage() {
             <div
               role="status"
               aria-live="polite"
-              className={`rounded-md px-3 py-2 text-xs ${
-                poNotification.type === 'success'
-                  ? 'bg-green-50 text-green-700 border border-green-100'
-                  : 'bg-red-50 text-red-700 border border-red-100'
-              }`}
+              className={`rounded-md px-3 py-2 text-xs ${poNotification.type === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-100'
+                : 'bg-red-50 text-red-700 border border-red-100'
+                }`}
             >
               {poNotification.message}
             </div>
@@ -1303,11 +1355,10 @@ export default function InventoryPage() {
                   <div
                     role="status"
                     aria-live="polite"
-                    className={`rounded-md px-3 py-2 text-sm ${
-                      poNotification.type === 'success'
-                        ? 'bg-green-50 text-green-700 border border-green-100'
-                        : 'bg-red-50 text-red-700 border border-red-100'
-                    }`}
+                    className={`rounded-md px-3 py-2 text-sm ${poNotification.type === 'success'
+                      ? 'bg-green-50 text-green-700 border border-green-100'
+                      : 'bg-red-50 text-red-700 border border-red-100'
+                      }`}
                   >
                     {poNotification.message}
                   </div>
@@ -1416,9 +1467,8 @@ export default function InventoryPage() {
         <div
           role="status"
           aria-live="polite"
-          className={`mt-4 rounded-md px-4 py-3 text-sm ${
-            adjustNotification.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'
-          }`}
+          className={`mt-4 rounded-md px-4 py-3 text-sm ${adjustNotification.type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' : 'bg-red-50 text-red-700 border border-red-100'
+            }`}
         >
           {adjustNotification.message}
         </div>
