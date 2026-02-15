@@ -48,7 +48,39 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
+          },
+          {
+            key: "X-XSS-Protection",
+            value: "1; mode=block",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+        ],
+      },
     ];
+  },
+
+  // Image optimization (merged from next.config.js)
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**.supabase.co",
+      },
+    ],
+    unoptimized: process.env.NODE_ENV === "development",
   },
 
   // Reduce build output verbosity
@@ -60,7 +92,7 @@ const nextConfig: NextConfig = {
 
   // Ensure native Prisma engines are included in serverless bundles.
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/.prisma/client/**"],
+    "/*": ["./node_modules/.prisma/client/**", "./node_modules/@prisma/client/**"],
   },
 };
 
