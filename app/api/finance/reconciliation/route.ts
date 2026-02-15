@@ -123,9 +123,9 @@ export async function GET(request: Request) {
     const refundAmount = refundsData.reduce((sum: number, o: { netAmount: number | null }) => sum + (o.netAmount || 0), 0);
 
     // Revenue by channel with names
-    const revenueByChannel: Record<string, { name: string; amount: number; orderCount: number; tax: number }> = {};
+    const revenueByChannel: Record<string, { name: string; amount: number; orderCount: number; tax: number }> = {} as Record<string, { name: string; amount: number; orderCount: number; tax: number }>;
     for (const item of revenueByChannelData) {
-      const channelName = channelMap.get(item.channelSourceId) ?? 'Direct';
+      const channelName = String(channelMap.get(item.channelSourceId) ?? 'Direct');
       revenueByChannel[item.channelSourceId] = {
         name: channelName,
         amount: item._sum?.netAmount ?? 0,

@@ -18,9 +18,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const created = [];
+    const created: Array<{ skuId: string; inventoryId: string }> = [];
     for (const it of items) {
-      let sku = null;
+      let sku: any = null;
       if (it.skuId) {
         sku = await prisma.sku.findUnique({ where: { id: it.skuId } }).catch(() => null);
       }
@@ -29,6 +29,10 @@ export async function POST(req: Request) {
       }
       if (!sku) {
         sku = await prisma.sku.create({ data: { orgId, code: `SKU-${Date.now()}`, name: it.skuName || 'Unknown', unit: it.unit || 'unit', basePrice: it.unitPrice || 0, costPrice: it.unitPrice || 0 } });
+      }
+
+      if (!sku) {
+        throw new Error('Failed to create or find SKU');
       }
 
       // Upsert inventory for this sku/location

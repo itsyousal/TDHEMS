@@ -219,7 +219,7 @@ export async function GET(request: Request) {
           const progress = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
           
           // Calculate duration
-          let durationMinutes = null;
+          let durationMinutes: number | null = null;
           if (run.completedAt) {
             durationMinutes = Math.round(
               (new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 60000

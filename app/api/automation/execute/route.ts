@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Execute actions
-    const results = [];
+    const results: any[] = [];
     let hasError = false;
     let errorMessage = '';
 
@@ -167,24 +167,41 @@ async function executeAction(action: any, triggerData: any, orgId: string): Prom
 
     case 'create_purchase_order':
       // Create purchase order in system
-      if (!actionData.skuId || !actionData.quantity || !actionData.supplierId) {
-        throw new Error('SKU ID, quantity, and supplier ID are required for PO creation');
+      if (!actionData.skuId || !actionData.quantity || !actionData.supplierId || !actionData.locationId) {
+        throw new Error('SKU ID, quantity, supplier ID, and location ID are required for PO creation');
       }
-      
+
+      // Create simple PO number
+      const poNumber = `PO-${Math.floor(Math.random() * 900000) + 100000}`;
+
       try {
+        const unitCost = typeof actionData.unitCost === 'number' ? actionData.unitCost : parseFloat(actionData.unitCost) || 0;
+        const quantity = typeof actionData.quantity === 'number' ? actionData.quantity : parseFloat(actionData.quantity) || 0;
+        const lineTotal = unitCost * quantity;
+
         const po = await prisma.purchaseOrder.create({
           data: {
             orgId,
-            skuId: actionData.skuId,
-            quantity: actionData.quantity,
+            poNumber,
             supplierId: actionData.supplierId,
+            locationId: actionData.locationId,
             status: 'draft',
-            totalAmount: actionData.totalAmount || 0,
+            totalCost: lineTotal,
             notes: actionData.notes || `Auto-created by automation rule: ${actionData.ruleName}`,
+            items: {
+              create: [
+                {
+                  skuId: actionData.skuId,
+                  quantity,
+                  unitCost,
+                  totalCost: lineTotal,
+                },
+              ],
+            },
           },
         });
-        
-        return { poId: po.id, status: 'created', totalAmount: po.totalAmount };
+
+        return { poId: po.id, status: 'created', totalCost: po.totalCost };
       } catch (error: any) {
         throw new Error(`Failed to create PO: ${error.message}`);
       }

@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status')?.trim(); // active, inactive, vip, blocked
     const loyaltyTier = searchParams.get('loyaltyTier')?.trim(); // bronze, silver, gold, platinum
 
-    const where: Prisma.CustomerWhereInput = {
+    const where: any = {
       orgId: session.user.organizationId,
     };
 
