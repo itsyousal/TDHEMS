@@ -10,63 +10,42 @@ export async function GET() {
     }
 
     try {
-        const batches = await prisma.productionBatch.findMany({
-            orderBy: {
-                plannedDate: "desc",
+        const batchesWithDetails = await prisma.productionBatch.findMany({
+            include: {
+                bom: {
+                    include: {
+                        sku: true,
+                    },
+                },
+                ingredients: {
+                    include: {
+                        sku: true,
+                    },
+                    take: 1,
+                },
             },
+            orderBy: { plannedDate: 'desc' },
             take: 50,
         });
 
-        // In a real app, we'd join with BOM or Product to get the product name.
-        // Since we didn't link BOMs in the seed (optional relation), we might not have product names directly.
-        // However, the UI expects a product name.
-        // For this demo, we can try to infer it or just show "Batch Product".
-        // Wait, the seed script didn't link BOMs.
-        // But `ProductionBatch` has `bomId`.
-        // If `bomId` is null, we have no product link.
-        // I should have linked BOMs or at least stored a product name if the schema allowed.
-        // Schema: `bomId String?`.
-        // `BatchIngredient` links to `Sku`.
-        // We can fetch ingredients to guess the product? No, that's complex.
-
-        // Let's check if I can update the seed to link BOMs?
-        // Or I can just return "Custom Batch" if no BOM.
-        // Actually, for the demo to look good, I should have linked BOMs.
-        // But I didn't create BOMs in the seed.
-
-        // Workaround: I'll fetch the first ingredient's SKU name if available, or use a placeholder.
-        // Or I can just update the seed to create BOMs and link them.
-        // That would be better but takes time.
-
-        // Alternative: The `ProductionBatch` table doesn't have a `productName` field.
-        // It relies on `Bom`.
-        // I'll update the API to return "Standard Batch" for now, 
-        // OR I can fetch the `BatchIngredient` and use the first SKU name as the "Product".
-
-        // Let's try fetching ingredients.
-        const batchesWithIngredients = await prisma.productionBatch.findMany({
-            include: {
-                ingredients: {
-                    include: {
-                        sku: true
-                    },
-                    take: 1
-                }
-            },
-            orderBy: { plannedDate: 'desc' },
-            take: 50
-        });
-
-        const formattedBatches = batchesWithIngredients.map((batch: { ingredients: any[]; batchNumber: string; yieldQuantity: number | null; status: string; startedAt: Date | null; completedAt: Date | null; plannedDate: Date }) => {
-            const productName = batch.ingredients[0]?.sku?.name || "Mixed Batch";
+        const formattedBatches = batchesWithDetails.map((batch) => {
+            // Get product name from BOM if available, otherwise use first ingredient
+            const productName = 
+                batch.bom?.sku?.name || 
+                batch.ingredients[0]?.sku?.name || 
+                "Production Batch";
 
             return {
-                id: batch.batchNumber,
+                id: batch.id,
+                batchNumber: batch.batchNumber,
                 product: productName,
-                qty: `${batch.yieldQuantity || 100} units`, // Mock quantity if null
+                quantity: batch.yieldQuantity || batch.yieldActual || 0,
+                plannedQuantity: batch.plannedQuantity || 0,
                 status: formatStatus(batch.status),
-                start: batch.startedAt ? format(new Date(batch.startedAt), "yyyy-MM-dd") : "-",
-                end: batch.completedAt ? format(new Date(batch.completedAt), "yyyy-MM-dd") : format(new Date(batch.plannedDate), "yyyy-MM-dd"),
+                startDate: batch.startedAt ? format(new Date(batch.startedAt), "yyyy-MM-dd") : "-",
+                endDate: batch.completedAt ? format(new Date(batch.completedAt), "yyyy-MM-dd") : format(new Date(batch.plannedDate), "yyyy-MM-dd"),
+                plannedDate: format(new Date(batch.plannedDate), "yyyy-MM-dd"),
+                createdAt: format(new Date(batch.createdAt), "yyyy-MM-dd HH:mm"),
             };
         });
 

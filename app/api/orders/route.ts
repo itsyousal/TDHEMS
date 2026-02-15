@@ -165,7 +165,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing essential fields' }, { status: 400 });
     }
 
-    const location = await prisma.location.findFirst({ where: { id: locationId, orgId } });
+    const location = await prisma.location.findFirst({
+      where: { id: locationId, orgId },
+      select: { id: true, orgId: true },
+    });
     if (!location) {
       return NextResponse.json({ error: 'Invalid location' }, { status: 400 });
     }

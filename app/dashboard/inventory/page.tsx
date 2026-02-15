@@ -191,6 +191,7 @@ export default function InventoryPage() {
   const [poStatus, setPoStatus] = useState<'idle' | 'submitting'>('idle');
   const [poNotification, setPoNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [apiLocations, setApiLocations] = useState<{ id: string; name: string }[]>([]);
   const [poDraftId, setPoDraftId] = useState(generatePurchaseOrderNumber);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
@@ -213,9 +214,10 @@ export default function InventoryPage() {
       }
 
       const inventoryQuery = inventoryParams.toString() ? `?${inventoryParams.toString()}` : '';
-      const [statsRes, itemsRes] = await Promise.all([
+      const [statsRes, itemsRes, locationsRes] = await Promise.all([
         fetch('/api/inventory/stats'),
         fetch(`/api/inventory${inventoryQuery}`),
+        fetch('/api/admin/locations'),
       ]);
 
       if (!statsRes.ok || !itemsRes.ok) {
@@ -224,6 +226,15 @@ export default function InventoryPage() {
 
       setStats(await statsRes.json());
       setItems(await itemsRes.json());
+      if (locationsRes.ok) {
+        const locData = await locationsRes.json();
+        // Normalize to {id, name}
+        setApiLocations(
+          Array.isArray(locData)
+            ? locData.map((l: any) => ({ id: l.id, name: l.name }))
+            : []
+        );
+      }
       setInventoryError(null);
     } catch (error) {
       console.error(error);
@@ -240,15 +251,18 @@ export default function InventoryPage() {
 
   const uniqueLocations = useMemo(() => {
     const map = new Map<string, string>();
+    // Start with locations from API (authoritative list)
+    apiLocations.forEach((loc) => map.set(loc.id, loc.name));
+    // Then add any locations derived from inventory items that aren't already present
     items.forEach((item) => {
-      if (!map.has(item.locationId)) {
+      if (item.locationId && !map.has(item.locationId)) {
         map.set(item.locationId, item.loc);
       }
     });
     return Array.from(map.entries())
       .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [items]);
+  }, [items, apiLocations]);
 
   useEffect(() => {
     if (!adjustForm.locationId && uniqueLocations.length) {
@@ -678,6 +692,14 @@ export default function InventoryPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => setIsQuickAddOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-dough-brown-200 bg-white px-3 py-1.5 text-xs font-semibold text-dough-brown-700 transition hover:bg-dough-brown-50"
+          >
+            <PlusCircle className="h-3.5 w-3.5" aria-hidden />
+            Add SKU
+          </button>
+          <button
+            type="button"
             onClick={() => setIsAdjustModalOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-md border border-dough-brown-200 bg-dough-brown-50 px-3 py-1.5 text-xs font-semibold text-dough-brown-700 transition hover:bg-dough-brown-100"
           >
@@ -703,6 +725,13 @@ export default function InventoryPage() {
           </button>
         </div>
       </div>
+      {/* Quick Add SKU Dialog (inventory-level) */}
+      <QuickAddSKUDialog
+        open={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        onSKUCreated={handleQuickSKUCreated}
+        locationId={adjustForm.locationId || (uniqueLocations[0]?.id ?? '')}
+      />
 
       <div className="mb-6 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
         {INVENTORY_CATEGORY_OPTIONS.map((option) => (

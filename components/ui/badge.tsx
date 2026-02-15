@@ -46,19 +46,19 @@ const badgeVariants = cva(
 )
 
 export interface BadgeProps
-    extends React.HTMLAttributes<HTMLDivElement>,
+    extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {
     dot?: boolean
 }
 
 function Badge({ className, variant, size, animate, dot, children, ...props }: BadgeProps) {
     return (
-        <div className={cn(badgeVariants({ variant, size, animate }), className)} {...props}>
+        <span className={cn(badgeVariants({ variant, size, animate }), className)} {...props}>
             {dot && (
                 <span className="h-1.5 w-1.5 rounded-full bg-current opacity-75" />
             )}
             {children}
-        </div>
+        </span>
     )
 }
 

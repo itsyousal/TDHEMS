@@ -162,6 +162,7 @@ export async function POST(request: Request) {
     // Validate location
     const location = await prisma.location.findFirst({
       where: { id: locationId, orgId },
+      select: { id: true, orgId: true },
     });
 
     if (!location) {

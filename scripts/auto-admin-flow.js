@@ -34,7 +34,8 @@ async function main() {
   }
 
   // Ensure there is at least one location for the org
-  let location = await prisma.location.findFirst({ where: { orgId: userOrg.orgId } });
+  // Select only necessary fields to avoid querying dropped columns
+  let location = await prisma.location.findFirst({ where: { orgId: userOrg.orgId }, select: { id: true, name: true } });
   if (!location) {
     location = await prisma.location.create({ data: { orgId: userOrg.orgId, name: 'Default Location', slug: 'default', type: 'store' } });
     console.log('Created default location:', location.id);

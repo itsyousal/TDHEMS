@@ -26,7 +26,7 @@ export async function getAuthSession(): Promise<DoughHouseSession | null> {
 
     // Development fallback: allow an env-provided dev account
     if (process.env.NODE_ENV !== "production") {
-      const devEmail = process.env.DEV_AUTH_EMAIL || "admin@doughhouse.local";
+      const devEmail = process.env.DEV_AUTH_EMAIL || "admin@test.com";
       if (devEmail) {
         return {
           user: {

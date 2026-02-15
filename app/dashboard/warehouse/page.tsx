@@ -1,7 +1,27 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Package, MapPin, AlertCircle, Truck } from 'lucide-react';
+import { Package, MapPin, AlertCircle, Truck, PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AddWarehouseDialog } from '@/components/warehouse/add-warehouse-dialog';
+import { WarehouseCard } from '@/components/warehouse/warehouse-card';
+import { toast } from 'sonner';
+
+interface Warehouse {
+  id: string;
+  name: string;
+  locationId: string;
+  capacity: number | null;
+  currentUtilization: number | null;
+  isActive: boolean;
+  location?: { id: string; name: string };
+  // bins removed from UI; keep model on server if needed
+}
+
+interface Location {
+  id: string;
+  name: string;
+}
 
 export default function WarehousePage() {
   const [stats, setStats] = useState<{
@@ -10,47 +30,57 @@ export default function WarehousePage() {
     totalCapacity: number;
     totalUtilization: number;
   } | null>(null);
-  const [bins, setBins] = useState<Array<{
-    location: string;
-    type: string;
-    capacity: number;
-    items: number;
-    util: number;
-  }>>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addWarehouseDialogOpen, setAddWarehouseDialogOpen] = useState(false);
+
+  const fetchAllData = async () => {
+    try {
+      const [statsRes, warehousesRes, locationsRes] = await Promise.all([
+        fetch('/api/warehouse/stats'),
+        fetch('/api/warehouse'),
+        fetch('/api/admin/locations'),
+      ]);
+
+      if (statsRes.ok) {
+        const s = await statsRes.json();
+        setStats(s);
+      }
+
+      if (warehousesRes.ok) {
+        const data = await warehousesRes.json();
+        setWarehouses(data);
+      }
+
+      if (locationsRes.ok) {
+        const data = await locationsRes.json();
+        setLocations(data);
+      }
+    } catch (e) {
+      console.error('Error fetching warehouse data', e);
+      toast.error('Failed to load warehouse data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [statsRes, warehousesRes] = await Promise.all([
-          fetch('/api/warehouse/stats'),
-          fetch('/api/warehouse'),
-        ]);
-        if (statsRes.ok) {
-          const s = await statsRes.json();
-          setStats(s);
-        }
-        if (warehousesRes.ok) {
-          const data = await warehousesRes.json();
-          const allBins = data.flatMap((w: any) =>
-            (w.bins || []).map((b: any) => ({
-              location: b.code,
-              type: 'Bin',
-              capacity: b.capacity ?? 0,
-              items: b.currentUtilization ?? 0,
-              util: b.capacity ? Math.round((b.currentUtilization / b.capacity) * 100) : 0,
-            }))
-          );
-          setBins(allBins);
-        }
-      } catch (e) {
-        console.error('Error fetching warehouse data', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
+    fetchAllData();
   }, []);
+
+  const handleWarehouseCreated = (newWarehouse: Warehouse) => {
+    setWarehouses((prev) => [...prev, newWarehouse]);
+    setAddWarehouseDialogOpen(false);
+    // Refresh stats
+    fetchAllData();
+  };
+
+  const handleWarehouseDeleted = (id: string) => {
+    setWarehouses((prev) => prev.filter((w) => w.id !== id));
+    // Refresh stats
+    fetchAllData();
+  };
 
   if (loading) {
     return (
@@ -62,12 +92,21 @@ export default function WarehousePage() {
 
   return (
     <>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Warehouse</h1>
-        <p className="text-sm text-gray-600 mt-1">Inventory and warehouse management</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Warehouse</h1>
+          <p className="text-sm text-gray-600 mt-1">Inventory and warehouse management</p>
+        </div>
+        <Button
+          onClick={() => setAddWarehouseDialogOpen(true)}
+          className="bg-dough-brown-600 hover:bg-dough-brown-700"
+        >
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Add Warehouse
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -79,17 +118,7 @@ export default function WarehousePage() {
             <MapPin className="w-10 h-10 text-dough-brown-200" />
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Bins</p>
-              <p className="text-3xl font-bold text-gold-accent-600 mt-2">
-                {stats?.totalBins ?? 0}
-              </p>
-            </div>
-            <Package className="w-10 h-10 text-gold-accent-200" />
-          </div>
-        </div>
+        {/* Total Bins removed per request */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -106,7 +135,7 @@ export default function WarehousePage() {
             <div>
               <p className="text-sm text-gray-600">Utilization</p>
               <p className="text-3xl font-bold text-blue-600 mt-2">
-                {stats?.totalUtilization ?? 0}
+                {stats?.totalUtilization ?? 0}%
               </p>
             </div>
             <Truck className="w-10 h-10 text-blue-200" />
@@ -114,37 +143,49 @@ export default function WarehousePage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-        <h2 className="text-lg font-semibold mb-4">Storage Locations</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Location</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Type</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Capacity</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Current Items</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Utilization</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bins.map((loc, idx) => (
-                <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900">{loc.location}</td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{loc.type}</td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{loc.capacity}</td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{loc.items}</td>
-                  <td className="py-3 px-4 text-sm">
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div className="bg-dough-brown-600 h-2 rounded-full" style={{ width: `${loc.util}%` }} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Warehouses Grid */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold">Your Warehouses</h2>
+        {warehouses.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+            <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-600 font-medium">No warehouses yet</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Create your first warehouse to get started with inventory management
+            </p>
+            <Button
+              onClick={() => setAddWarehouseDialogOpen(true)}
+              className="mt-4 bg-dough-brown-600 hover:bg-dough-brown-700"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Create Warehouse
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {warehouses.map((warehouse) => (
+              <WarehouseCard
+                key={warehouse.id}
+                id={warehouse.id}
+                name={warehouse.name}
+                locationName={warehouse.location?.name || 'Unknown'}
+                capacity={warehouse.capacity}
+                currentUtilization={warehouse.currentUtilization}
+                isActive={warehouse.isActive}
+                onDelete={handleWarehouseDeleted}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Add Warehouse Dialog */}
+      <AddWarehouseDialog
+        open={addWarehouseDialogOpen}
+        onClose={() => setAddWarehouseDialogOpen(false)}
+        onWarehouseCreated={handleWarehouseCreated}
+        locations={locations}
+      />
     </>
   );
 }

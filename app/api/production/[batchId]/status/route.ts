@@ -92,6 +92,7 @@ export async function PATCH(
         // Get the first location for this org to add inventory
         const location = await prisma.location.findFirst({
           where: { orgId: batch.orgId, isActive: true },
+          select: { id: true },
         });
 
         if (location) {

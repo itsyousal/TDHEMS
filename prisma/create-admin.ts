@@ -4,8 +4,8 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-    const email = "admin@doughhouse.com";
-    const password = "AdminPassword123!";
+    const email = "admin2@test.com";
+    const password = "admin123";
     const orgName = "The Dough House";
     const orgSlug = "dough-house-hq";
 

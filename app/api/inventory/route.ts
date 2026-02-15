@@ -31,7 +31,12 @@ export async function GET(req: Request) {
         const inventory = await prisma.inventory.findMany({
             include: {
                 sku: true,
-                location: true,
+                location: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
             },
             where: inventoryType
                 ? {
