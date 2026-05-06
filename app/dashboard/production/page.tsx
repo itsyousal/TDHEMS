@@ -452,7 +452,7 @@ export default function ProductionPage() {
             <button
               type="submit"
               disabled={formStatus === 'submitting'}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-dough-brown-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-dough-brown-600 disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-dough-brown-500 px-4 py-2 text-sm font-semibold shadow-sm transition hover:bg-dough-brown-600 disabled:opacity-60"
             >
               {formStatus === 'submitting' ? (
                 <span className="flex items-center gap-2">

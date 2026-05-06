@@ -50,6 +50,7 @@ import {
   Wallet,
   X,
   Check,
+  Plus,
 } from 'lucide-react';
 
 // Currency formatter for INR
@@ -145,6 +146,17 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
   const [reconciliationNotes, setReconciliationNotes] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('today');
   const [transactionFilter, setTransactionFilter] = useState('all');
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [isSubmittingTxn, setIsSubmittingTxn] = useState(false);
+  const [txnForm, setTxnForm] = useState({
+    type: 'revenue',
+    category: '',
+    amount: '',
+    taxAmount: '0',
+    description: '',
+    paymentMethod: 'cash',
+    transactionDate: new Date().toISOString().slice(0, 10),
+  });
 
   const fetchStats = useCallback(async () => {
     try {
@@ -303,6 +315,47 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
       toast.error(error.message || 'Failed to confirm reconciliation');
     } finally {
       setIsReconciling(false);
+    }
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!permissions.canManage) return toast.error('Permission denied');
+    
+    setIsSubmittingTxn(true);
+    try {
+      const res = await fetch('/api/finance/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...txnForm,
+          amount: parseFloat(txnForm.amount),
+          taxAmount: parseFloat(txnForm.taxAmount) || 0,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create transaction');
+      }
+
+      toast.success('Transaction created successfully');
+      setShowTransactionModal(false);
+      setTxnForm({
+        type: 'revenue',
+        category: '',
+        amount: '',
+        taxAmount: '0',
+        description: '',
+        paymentMethod: 'cash',
+        transactionDate: new Date().toISOString().slice(0, 10),
+      });
+      fetchTransactions();
+      fetchStats();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsSubmittingTxn(false);
     }
   };
 
@@ -630,18 +683,26 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
               </CardTitle>
               <CardDescription>Latest financial transactions</CardDescription>
             </div>
-            <Select value={transactionFilter} onValueChange={setTransactionFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="revenue">Revenue</SelectItem>
-                <SelectItem value="expense">Expenses</SelectItem>
-                <SelectItem value="payroll">Payroll</SelectItem>
-                <SelectItem value="purchase">Purchases</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={transactionFilter} onValueChange={setTransactionFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="revenue">Revenue</SelectItem>
+                  <SelectItem value="expense">Expenses</SelectItem>
+                  <SelectItem value="payroll">Payroll</SelectItem>
+                  <SelectItem value="purchase">Purchases</SelectItem>
+                </SelectContent>
+              </Select>
+              {permissions.canManage && (
+                <Button onClick={() => setShowTransactionModal(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Transaction
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -821,6 +882,80 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
               Confirm Daily Reconciliation
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transaction Modal */}
+      <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Transaction</DialogTitle>
+            <DialogDescription>Manually record a financial transaction.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTransaction} className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={txnForm.type} onValueChange={(val) => setTxnForm({...txnForm, type: val})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="revenue">Revenue</SelectItem>
+                    <SelectItem value="expense">Expense</SelectItem>
+                    <SelectItem value="refund">Refund</SelectItem>
+                    <SelectItem value="adjustment">Adjustment</SelectItem>
+                    <SelectItem value="transfer">Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Input required value={txnForm.category} onChange={e => setTxnForm({...txnForm, category: e.target.value})} placeholder="e.g. Sales, Rent" />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input type="number" step="0.01" required value={txnForm.amount} onChange={e => setTxnForm({...txnForm, amount: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tax Amount</Label>
+                <Input type="number" step="0.01" value={txnForm.taxAmount} onChange={e => setTxnForm({...txnForm, taxAmount: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input type="date" required value={txnForm.transactionDate} onChange={e => setTxnForm({...txnForm, transactionDate: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <Select value={txnForm.paymentMethod} onValueChange={(val) => setTxnForm({...txnForm, paymentMethod: val})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input value={txnForm.description} onChange={e => setTxnForm({...txnForm, description: e.target.value})} placeholder="Optional description..." />
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button type="button" variant="outline" onClick={() => setShowTransactionModal(false)}>Cancel</Button>
+              <Button type="submit" disabled={isSubmittingTxn}>
+                {isSubmittingTxn ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                Save Transaction
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

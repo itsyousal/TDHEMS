@@ -144,6 +144,12 @@ const navItems: NavItem[] = [
         permission: 'hr.manage',
       },
       {
+        name: 'Shift Management',
+        href: '/dashboard/shifts',
+        icon: <></>,
+        permission: 'hr.manage',
+      },
+      {
         name: 'Access Management',
         href: '/dashboard/admin/access-management',
         icon: <></>,
@@ -304,11 +310,10 @@ export function Sidebar({ userPermissions = [], isOpen = true, onClose }: Sideba
                   {isActive(item.href) && (
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-500 rounded-r-full" />
                   )}
-                  
+
                   <div className="flex items-center gap-3">
-                    <span className={`flex-shrink-0 transition-colors ${
-                      isActive(item.href) ? 'text-amber-600' : 'text-gray-500 group-hover:text-gray-700'
-                    }`}>
+                    <span className={`flex-shrink-0 transition-colors ${isActive(item.href) ? 'text-amber-600' : 'text-gray-500 group-hover:text-gray-700'
+                      }`}>
                       {item.icon}
                     </span>
                     <span className="text-sm">{item.name}</span>
@@ -316,9 +321,8 @@ export function Sidebar({ userPermissions = [], isOpen = true, onClose }: Sideba
                   {item.submenu && (
                     <ChevronRight
                       size={16}
-                      className={`text-gray-400 transition-all duration-300 ease-in-out ${
-                        expandedItems.includes(item.href) ? 'rotate-90 text-amber-500' : ''
-                      }`}
+                      className={`text-gray-400 transition-all duration-300 ease-in-out ${expandedItems.includes(item.href) ? 'rotate-90 text-amber-500' : ''
+                        }`}
                     />
                   )}
                 </Link>
@@ -326,11 +330,10 @@ export function Sidebar({ userPermissions = [], isOpen = true, onClose }: Sideba
                 {/* Submenu */}
                 {item.submenu && (
                   <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      expandedItems.includes(item.href)
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedItems.includes(item.href)
                         ? 'max-h-96 opacity-100 mt-1'
                         : 'max-h-0 opacity-0'
-                    }`}
+                      }`}
                   >
                     <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-1">
                       {item.submenu.map((subitem, index) => (
