@@ -51,6 +51,8 @@ import {
   X,
   Check,
   Plus,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 
 // Currency formatter for INR
@@ -130,9 +132,12 @@ interface Transaction {
   type: string;
   category: string;
   amount: number;
+  taxAmount?: number;
+  netAmount?: number;
   description: string;
   transactionDate: string;
   paymentStatus: string;
+  paymentMethod?: string;
   referenceType?: string;
 }
 
@@ -147,6 +152,7 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
   const [selectedPeriod, setSelectedPeriod] = useState('today');
   const [transactionFilter, setTransactionFilter] = useState('all');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isSubmittingTxn, setIsSubmittingTxn] = useState(false);
   const [txnForm, setTxnForm] = useState({
     type: 'revenue',
@@ -318,14 +324,20 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
     }
   };
 
-  const handleCreateTransaction = async (e: React.FormEvent) => {
+  const handleSubmitTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!permissions.canManage) return toast.error('Permission denied');
     
     setIsSubmittingTxn(true);
     try {
-      const res = await fetch('/api/finance/transactions', {
-        method: 'POST',
+      const url = editingTransaction 
+        ? `/api/finance/transactions/${editingTransaction.id}` 
+        : '/api/finance/transactions';
+      
+      const method = editingTransaction ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...txnForm,
@@ -336,11 +348,12 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to create transaction');
+        throw new Error(err.error || `Failed to ${editingTransaction ? 'update' : 'create'} transaction`);
       }
 
-      toast.success('Transaction created successfully');
+      toast.success(`Transaction ${editingTransaction ? 'updated' : 'created'} successfully`);
       setShowTransactionModal(false);
+      setEditingTransaction(null);
       setTxnForm({
         type: 'revenue',
         category: '',
@@ -741,6 +754,29 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
                     <TableCell className={`text-right font-semibold ${getTransactionTypeColor(txn.type)}`}>
                       {txn.amount >= 0 ? '+' : ''}{formatCurrency(txn.amount)}
                     </TableCell>
+                    {permissions.canManage && (
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            setEditingTransaction(txn);
+                            setTxnForm({
+                              type: txn.type,
+                              category: txn.category,
+                              amount: Math.abs(txn.amount).toString(),
+                              taxAmount: (txn.taxAmount || 0).toString(),
+                              description: txn.description || '',
+                              paymentMethod: txn.paymentMethod || 'cash',
+                              transactionDate: new Date(txn.transactionDate).toISOString().slice(0, 10),
+                            });
+                            setShowTransactionModal(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               ) : (
@@ -886,13 +922,29 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
       </Dialog>
 
       {/* Transaction Modal */}
-      <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>
+      <Dialog open={showTransactionModal} onOpenChange={(open) => {
+        setShowTransactionModal(open);
+        if (!open) {
+          setEditingTransaction(null);
+          setTxnForm({
+            type: 'revenue',
+            category: '',
+            amount: '',
+            taxAmount: '0',
+            description: '',
+            paymentMethod: 'cash',
+            transactionDate: new Date().toISOString().slice(0, 10),
+          });
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Transaction</DialogTitle>
-            <DialogDescription>Manually record a financial transaction.</DialogDescription>
+            <DialogTitle>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
+            <DialogDescription>
+              {editingTransaction ? 'Update the details of this transaction.' : 'Manually record a financial transaction.'}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateTransaction} className="space-y-4 py-4">
+          <form onSubmit={handleSubmitTransaction} className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Type</Label>
