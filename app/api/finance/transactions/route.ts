@@ -2,106 +2,120 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
+import { measureAsync } from '@/lib/perf';
+import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
 
 /**
  * GET /api/finance/transactions
  * List financial transactions with filtering and pagination
  */
 export async function GET(request: Request) {
-  try {
-    const session = await getAuthSession();
-    if (!session?.user?.id || !session?.user?.organizationId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  return measureAsync('api.finance.transactions.GET', async () => {
+    try {
+      const session = await getAuthSession();
+      if (!session?.user?.id || !session?.user?.organizationId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
 
-    const orgId = session.user.organizationId;
+      const orgId = session.user.organizationId;
 
-    // Check permission
-    const canView = await hasPermission(session.user.id, 'finance.view', orgId);
-    if (!canView) {
+      // Try cache first (keyed by org + querystring)
+      const url = new URL(request.url);
+      const qs = url.searchParams.toString();
+      const cacheKey = `finance:transactions:${orgId}:${qs}`;
+      const cached = cacheGet<any>(cacheKey);
+      if (cached) return NextResponse.json(cached);
+
+      // Check permission
+      const canView = await hasPermission(session.user.id, 'finance.view', orgId);
+      if (!canView) {
+        return NextResponse.json(
+          { error: 'Access denied. Finance view permission required.' },
+          { status: 403 }
+        );
+      }
+
+      const url = new URL(request.url);
+      const page = parseInt(url.searchParams.get('page') || '1');
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+      const type = url.searchParams.get('type'); // revenue, expense, refund, adjustment
+      const category = url.searchParams.get('category');
+      const startDate = url.searchParams.get('startDate');
+      const endDate = url.searchParams.get('endDate');
+      const isReconciled = url.searchParams.get('isReconciled');
+      const search = url.searchParams.get('search');
+
+      const where: any = { orgId };
+
+      if (type) {
+        where.type = type;
+      }
+
+      if (category) {
+        where.category = category;
+      }
+
+      if (startDate) {
+        where.transactionDate = { ...where.transactionDate, gte: new Date(startDate) };
+      }
+
+      if (endDate) {
+        where.transactionDate = { ...where.transactionDate, lte: new Date(endDate) };
+      }
+
+      if (isReconciled !== null && isReconciled !== undefined && isReconciled !== '') {
+        where.isReconciled = isReconciled === 'true';
+      }
+
+      if (search) {
+        where.OR = [
+          { transactionNumber: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { channelName: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
+      const [transactions, total] = await Promise.all([
+        prisma.financialTransaction.findMany({
+          where,
+          orderBy: { transactionDate: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.financialTransaction.count({ where }),
+      ]);
+
+      // Calculate summary for filtered results
+      const summary = await prisma.financialTransaction.aggregate({
+        where,
+        _sum: { amount: true, netAmount: true, taxAmount: true },
+      });
+
+      const payload = {
+        data: transactions,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        summary: {
+          totalAmount: summary._sum?.amount ?? 0,
+          totalNetAmount: summary._sum?.netAmount ?? 0,
+          totalTax: summary._sum?.taxAmount ?? 0,
+        },
+      };
+
+      cacheSet(cacheKey, payload, 30 * 1000);
+      return NextResponse.json(payload);
+    } catch (error) {
+      console.error('[FINANCE_TRANSACTIONS_GET]', error);
       return NextResponse.json(
-        { error: 'Access denied. Finance view permission required.' },
-        { status: 403 }
+        { error: 'Failed to fetch transactions' },
+        { status: 500 }
       );
     }
-
-    const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
-    const type = url.searchParams.get('type'); // revenue, expense, refund, adjustment
-    const category = url.searchParams.get('category');
-    const startDate = url.searchParams.get('startDate');
-    const endDate = url.searchParams.get('endDate');
-    const isReconciled = url.searchParams.get('isReconciled');
-    const search = url.searchParams.get('search');
-
-    const where: any = { orgId };
-
-    if (type) {
-      where.type = type;
-    }
-
-    if (category) {
-      where.category = category;
-    }
-
-    if (startDate) {
-      where.transactionDate = { ...where.transactionDate, gte: new Date(startDate) };
-    }
-
-    if (endDate) {
-      where.transactionDate = { ...where.transactionDate, lte: new Date(endDate) };
-    }
-
-    if (isReconciled !== null && isReconciled !== undefined && isReconciled !== '') {
-      where.isReconciled = isReconciled === 'true';
-    }
-
-    if (search) {
-      where.OR = [
-        { transactionNumber: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { channelName: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
-    const [transactions, total] = await Promise.all([
-      prisma.financialTransaction.findMany({
-        where,
-        orderBy: { transactionDate: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.financialTransaction.count({ where }),
-    ]);
-
-    // Calculate summary for filtered results
-    const summary = await prisma.financialTransaction.aggregate({
-      where,
-      _sum: { amount: true, netAmount: true, taxAmount: true },
-    });
-
-    return NextResponse.json({
-      data: transactions,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-      summary: {
-        totalAmount: summary._sum?.amount ?? 0,
-        totalNetAmount: summary._sum?.netAmount ?? 0,
-        totalTax: summary._sum?.taxAmount ?? 0,
-      },
-    });
-  } catch (error) {
-    console.error('[FINANCE_TRANSACTIONS_GET]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch transactions' },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 /**
@@ -204,6 +218,9 @@ export async function POST(request: Request) {
         status: 'success',
       },
     });
+
+    // Invalidate finance caches for this org
+    cacheDelPrefix(`finance:${orgId}:`);
 
     return NextResponse.json(transaction, { status: 201 });
   } catch (error) {

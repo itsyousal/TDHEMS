@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
+import { measureAsync } from '@/lib/perf';
 
 /**
  * GET /api/checklists/analytics
@@ -9,11 +10,12 @@ import { hasPermission } from '@/lib/rbac';
  * Access: checklists.manage permission required (super admin only)
  */
 export async function GET(request: Request) {
-  try {
-    const session = await getAuthSession();
-    if (!session?.user?.id || !session?.user?.organizationId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  return measureAsync('api.checklists.analytics', async () => {
+    try {
+      const session = await getAuthSession();
+      if (!session?.user?.id || !session?.user?.organizationId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
 
     const orgId = session.user.organizationId;
     const userId = session.user.id;
@@ -192,6 +194,12 @@ export async function GET(request: Request) {
           ),
         });
       }
+    } catch (error) {
+      console.error('[CHECKLISTS_ANALYTICS_GET]', error);
+      return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
+    }
+  });
+}
 
       case 'history': {
         // Get paginated run history

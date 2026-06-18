@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { subDays, startOfDay, format } from 'date-fns';
+import { measureAsync } from '@/lib/perf';
 
 export async function GET() {
-    try {
-        const today = new Date();
-        const sevenDaysAgo = subDays(today, 7);
+    return measureAsync('api.dashboard.stats', async () => {
+        try {
+            const today = new Date();
+            const sevenDaysAgo = subDays(today, 7);
 
         // 1. Basic Stats
         const [
@@ -228,13 +230,14 @@ export async function GET() {
             topProducts,
             recentActivity: activities,
         });
-    } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch dashboard stats' },
-            { status: 500 }
-        );
-    }
+        } catch (error) {
+            console.error('Error fetching dashboard stats:', error);
+            return NextResponse.json(
+                { error: 'Failed to fetch dashboard stats' },
+                { status: 500 }
+            );
+        }
+    });
 }
 
 function getChannelColor(slug?: string) {

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
+import { measureAsync } from '@/lib/perf';
 
 /**
  * GET /api/checklists
@@ -10,8 +11,9 @@ import { hasPermission } from '@/lib/rbac';
  * Access: checklists.view permission required
  */
 export async function GET(request: Request) {
-  try {
-    const session = await getAuthSession();
+  return measureAsync('api.checklists.list', async () => {
+    try {
+      const session = await getAuthSession();
     if (!session?.user?.id || !session?.user?.organizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -111,13 +113,14 @@ export async function GET(request: Request) {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error) {
-    console.error('[CHECKLISTS_GET]', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch checklists' },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error('[CHECKLISTS_GET]', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch checklists' },
+        { status: 500 }
+      );
+    }
+  });
 }
 
 /**

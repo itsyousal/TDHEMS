@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -164,130 +164,99 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
     transactionDate: new Date().toISOString().slice(0, 10),
   });
 
-  const fetchStats = useCallback(async () => {
+  // Coalesced fetch: fetch stats, transactions and reconciliation together to avoid duplicate
+  // network requests. Keeps existing endpoints and response mappings intact.
+  const fetchDashboardData = useCallback(async (opts?: { period?: string; txnFilter?: string }) => {
     try {
-      // Map 'today' to 'day' for API compatibility
-      const apiPeriod = selectedPeriod === 'today' ? 'day' : selectedPeriod;
-      const params = new URLSearchParams({ period: apiPeriod });
-      const res = await fetch(`/api/finance/stats?${params}`);
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error(`Finance stats API error: ${res.status}`, errorData);
-        throw new Error(errorData.details || `Failed to fetch stats: ${res.status}`);
-      }
-      const data = await res.json();
-      
-      // Map API response to component state structure
-      const mappedStats: FinanceStats = {
-        totalRevenue: data.summary?.totalRevenue || 0,
-        totalExpenses: data.summary?.totalExpenses || 0,
-        netProfit: data.summary?.netProfit || 0,
-        pendingInvoices: data.counts?.pendingReconciliations || 0,
-        overdueInvoices: 0,
-        revenueByChannel: (data.revenueByChannel || []).map((ch: { channelId: string; channelName: string; revenue: number; orderCount: number }) => ({
-          channel: ch.channelId,
-          channelName: ch.channelName,
-          amount: ch.revenue,
-          orderCount: ch.orderCount,
-        })),
-        expensesByCategory: data.expensesByCategory || [],
-        comparison: {
-          revenueChange: data.trends?.revenueTrend || 0,
-          expenseChange: data.trends?.expenseTrend || 0,
-          profitChange: data.trends?.revenueTrend || 0, // Approximate profit trend from revenue
-        },
-      };
-      setStats(mappedStats);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      toast.error('Failed to load financial statistics');
-    }
-  }, [selectedPeriod]);
+      setIsLoading(true);
+      const apiPeriod = (opts?.period ?? selectedPeriod) === 'today' ? 'day' : (opts?.period ?? selectedPeriod);
 
-  const fetchTransactions = useCallback(async () => {
-    try {
-      const params = new URLSearchParams({ limit: '10' });
-      if (transactionFilter !== 'all') {
-        params.set('type', transactionFilter);
-      }
-      const res = await fetch(`/api/finance/transactions?${params}`);
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error(`Finance transactions API error: ${res.status}`, errorData);
-        throw new Error(errorData.details || `Failed to fetch transactions: ${res.status}`);
-      }
-      const data = await res.json();
-      setTransactions(data.data || []);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      toast.error('Failed to load transactions');
-    }
-  }, [transactionFilter]);
+      const txParams = new URLSearchParams({ limit: '10' });
+      if ((opts?.txnFilter ?? transactionFilter) !== 'all') txParams.set('type', opts?.txnFilter ?? transactionFilter);
 
-  const fetchReconciliation = useCallback(async () => {
-    try {
+      const statsPromise = fetch(`/api/finance/stats?period=${apiPeriod}`);
+      const txPromise = fetch(`/api/finance/transactions?${txParams}`);
       const today = new Date().toISOString().slice(0, 10);
-      const res = await fetch(`/api/finance/reconciliation?date=${today}`);
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error(`Finance reconciliation API error: ${res.status}`, errorData);
-        throw new Error(errorData.details || `Failed to fetch reconciliation: ${res.status}`);
+      const reconPromise = fetch(`/api/finance/reconciliation?date=${today}`);
+
+      const [sRes, tRes, rRes] = await Promise.all([statsPromise, txPromise, reconPromise]);
+
+      if (!sRes.ok) {
+        const err = await sRes.json().catch(() => ({ error: 'Unknown' }));
+        console.error('Finance stats API error', sRes.status, err);
+        toast.error('Failed to load financial statistics');
+      } else {
+        const data = await sRes.json();
+        const mappedStats: FinanceStats = {
+          totalRevenue: data.summary?.totalRevenue || 0,
+          totalExpenses: data.summary?.totalExpenses || 0,
+          netProfit: data.summary?.netProfit || 0,
+          pendingInvoices: data.counts?.pendingReconciliations || 0,
+          overdueInvoices: 0,
+          revenueByChannel: (data.revenueByChannel || []).map((ch: any) => ({
+            channel: ch.channelId,
+            channelName: ch.channelName,
+            amount: ch.revenue,
+            orderCount: ch.orderCount,
+          })),
+          expensesByCategory: data.expensesByCategory || [],
+          comparison: {
+            revenueChange: data.trends?.revenueTrend || 0,
+            expenseChange: data.trends?.expenseTrend || 0,
+            profitChange: data.trends?.revenueTrend || 0,
+          },
+        };
+        setStats(mappedStats);
       }
-      const data = await res.json();
-      
-      // Map API response to component state structure
-      const channelData = data.revenueByChannel || {};
-      const revenueByChannelArray = Object.entries(channelData).map(([channelId, info]: [string, any]) => ({
-        channel: channelId,
-        channelName: info.name || 'Direct',
-        amount: info.amount || 0,
-        orderCount: info.orderCount || 0,
-      }));
-      
-      const mappedReconciliation: DailyReconciliation = {
-        id: data.id,
-        reconciliationDate: data.date || data.reconciliationDate,
-        totalRevenue: data.totalRevenue || 0,
-        totalExpenses: data.totalExpenses || 0,
-        totalTax: data.taxCollected || data.netTax || 0,
-        netIncome: data.netProfit || 0,
-        revenueByChannel: revenueByChannelArray,
-        orderCount: data.totalOrders || 0,
-        averageOrderValue: data.totalOrders > 0 ? (data.totalRevenue || 0) / data.totalOrders : 0,
-        status: data.status || 'pending',
-        confirmedBy: data.confirmedBy,
-        confirmedAt: data.confirmedAt,
-      };
-      
-      setReconciliation(mappedReconciliation);
+
+      if (!tRes.ok) {
+        const err = await tRes.json().catch(() => ({ error: 'Unknown' }));
+        console.error('Finance transactions API error', tRes.status, err);
+        toast.error('Failed to load transactions');
+      } else {
+        const tData = await tRes.json();
+        setTransactions(tData.data || []);
+      }
+
+      if (!rRes.ok) {
+        const err = await rRes.json().catch(() => ({ error: 'Unknown' }));
+        console.error('Finance reconciliation API error', rRes.status, err);
+      } else {
+        const rd = await rRes.json();
+        const channelData = rd.revenueByChannel || {};
+        const revenueByChannelArray = Object.entries(channelData).map(([channelId, info]: [string, any]) => ({
+          channel: channelId,
+          channelName: info.name || 'Direct',
+          amount: info.amount || 0,
+          orderCount: info.orderCount || 0,
+        }));
+
+        const mappedReconciliation: DailyReconciliation = {
+          id: rd.id,
+          reconciliationDate: rd.date || rd.reconciliationDate,
+          totalRevenue: rd.totalRevenue || 0,
+          totalExpenses: rd.totalExpenses || 0,
+          totalTax: rd.taxCollected || rd.netTax || 0,
+          netIncome: rd.netProfit || 0,
+          revenueByChannel: revenueByChannelArray,
+          orderCount: rd.totalOrders || 0,
+          averageOrderValue: rd.totalOrders > 0 ? (rd.totalRevenue || 0) / rd.totalOrders : 0,
+          status: rd.status || 'pending',
+          confirmedBy: rd.confirmedBy,
+          confirmedAt: rd.confirmedAt,
+        };
+        setReconciliation(mappedReconciliation);
+      }
     } catch (error) {
-      console.error('Error fetching reconciliation:', error);
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    await Promise.all([fetchStats(), fetchTransactions(), fetchReconciliation()]);
-    setIsLoading(false);
-  }, [fetchStats, fetchTransactions, fetchReconciliation]);
+  }, [selectedPeriod, transactionFilter]);
 
   useEffect(() => {
-    if (permissions.canView) {
-      loadData();
-    }
-  }, [permissions.canView, loadData]);
-
-  useEffect(() => {
-    if (permissions.canView) {
-      fetchStats();
-    }
-  }, [permissions.canView, selectedPeriod, fetchStats]);
-
-  useEffect(() => {
-    if (permissions.canView) {
-      fetchTransactions();
-    }
-  }, [permissions.canView, transactionFilter, fetchTransactions]);
+    if (permissions.canView) fetchDashboardData();
+  }, [permissions.canView, fetchDashboardData]);
 
   const handleConfirmReconciliation = async () => {
     if (!permissions.canReconcile) {
@@ -363,8 +332,8 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
         paymentMethod: 'cash',
         transactionDate: new Date().toISOString().slice(0, 10),
       });
-      fetchTransactions();
-      fetchStats();
+      // Refresh consolidated dashboard data
+      fetchDashboardData();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -417,6 +386,11 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
+  }
+
+  function loadData(event?: React.MouseEvent<HTMLButtonElement>): void {
+    // Refresh dashboard data when user clicks Refresh
+    fetchDashboardData();
   }
 
   return (
