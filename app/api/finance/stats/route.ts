@@ -19,9 +19,12 @@ export async function GET(request: Request) {
 
       const orgId = session.user.organizationId;
 
+      const url = new URL(request.url);
+      const period = url.searchParams.get('period') || 'month'; // day, week, month, quarter, year
+
       // Return cached response if available (short TTL)
       const cacheKey = `finance:stats:${orgId}:${period}`;
-      const cached = cacheGet<any>(cacheKey);
+      const cached = await cacheGet<any>(cacheKey);
       if (cached) {
         return NextResponse.json(cached);
       }
@@ -35,8 +38,7 @@ export async function GET(request: Request) {
         );
       }
 
-      const url = new URL(request.url);
-      const period = url.searchParams.get('period') || 'month'; // day, week, month, quarter, year
+      
 
       // Calculate date ranges
       const now = new Date();

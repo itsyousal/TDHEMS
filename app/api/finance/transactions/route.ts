@@ -20,10 +20,10 @@ export async function GET(request: Request) {
       const orgId = session.user.organizationId;
 
       // Try cache first (keyed by org + querystring)
-      const url = new URL(request.url);
-      const qs = url.searchParams.toString();
+      const reqUrl = new URL(request.url);
+      const qs = reqUrl.searchParams.toString();
       const cacheKey = `finance:transactions:${orgId}:${qs}`;
-      const cached = cacheGet<any>(cacheKey);
+      const cached = await cacheGet<any>(cacheKey);
       if (cached) return NextResponse.json(cached);
 
       // Check permission
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
         },
       };
 
-      cacheSet(cacheKey, payload, 30 * 1000);
+      await cacheSet(cacheKey, payload, 30 * 1000);
       return NextResponse.json(payload);
     } catch (error) {
       console.error('[FINANCE_TRANSACTIONS_GET]', error);
@@ -220,7 +220,7 @@ export async function POST(request: Request) {
     });
 
     // Invalidate finance caches for this org
-    cacheDelPrefix(`finance:${orgId}:`);
+    await cacheDelPrefix(`finance:${orgId}:`);
 
     return NextResponse.json(transaction, { status: 201 });
   } catch (error) {

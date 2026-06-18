@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
     // Try cache keyed by org + date
     const cacheKey = `finance:recon:${orgId}:${startOfDay.toISOString().slice(0,10)}`;
-    const cached = cacheGet<any>(cacheKey);
+    const cached = await cacheGet<any>(cacheKey);
     if (cached) return NextResponse.json(cached);
 
     // Check for existing reconciliation
@@ -150,7 +150,7 @@ export async function GET(request: Request) {
       purchaseOrders: purchaseOrdersData.map((po: any) => ({ id: po.id, poNumber: po.poNumber, supplierName: po.supplier?.name || 'Direct', totalCost: po.totalCost, receivedDate: po.receivedDate })),
     };
 
-    cacheSet(cacheKey, summary, 30 * 1000);
+    await cacheSet(cacheKey, summary, 30 * 1000);
     return NextResponse.json(summary);
   } catch (error) {
     console.error('[FINANCE_RECONCILIATION_GET]', error);
@@ -183,6 +183,7 @@ export async function POST(request: Request) {
       actualCash,
       varianceNotes,
       notes,
+      // Summary data
       totalRevenue,
       orderRevenue,
       otherRevenue,
@@ -209,10 +210,12 @@ export async function POST(request: Request) {
     const reconciliationDate = new Date(date);
     reconciliationDate.setHours(0, 0, 0, 0);
 
+    // Calculate expected cash and variance
     const expectedCash = totalRevenue || 0;
     const actualCashValue = actualCash !== undefined && actualCash !== null ? parseFloat(String(actualCash)) : null;
     const cashVariance = actualCashValue !== null ? actualCashValue - expectedCash : null;
 
+    // Upsert reconciliation record
     const reconciliation = await prisma.dailyReconciliation.upsert({
       where: { orgId_reconciliationDate: { orgId, reconciliationDate } },
       update: {
@@ -276,177 +279,11 @@ export async function POST(request: Request) {
     await prisma.auditLog.create({ data: { userId: session.user.id, action: 'create', resource: 'daily_reconciliation', resourceId: reconciliation.id, changes: { date: reconciliationDate.toISOString().split('T')[0], totalRevenue, totalExpenses, netProfit, actualCash: actualCashValue, cashVariance }, status: 'success' } });
 
     // Invalidate finance caches for this org
-    cacheDelPrefix(`finance:${orgId}:`);
+    await cacheDelPrefix(`finance:${orgId}:`);
 
     return NextResponse.json({ success: true, reconciliation: { id: reconciliation.id, date: reconciliation.reconciliationDate, status: reconciliation.status, confirmedAt: reconciliation.confirmedAt, netProfit: reconciliation.netProfit, cashVariance: reconciliation.cashVariance } });
   } catch (error) {
     console.error('[FINANCE_RECONCILIATION_POST]', error);
     return NextResponse.json({ error: 'Failed to confirm reconciliation' }, { status: 500 });
-  }
-}
-}
-
-/**
- * POST /api/finance/reconciliation
- * Confirm daily reconciliation
- */
-export async function POST(request: Request) {
-  try {
-    const session = await getAuthSession();
-    if (!session?.user?.id || !session?.user?.organizationId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const orgId = session.user.organizationId;
-
-    // Check permission - require finance.reconcile for confirming
-    const canReconcile = await hasPermission(session.user.id, 'finance.reconcile', orgId);
-    if (!canReconcile) {
-      return NextResponse.json(
-        { error: 'Access denied. Finance reconcile permission required.' },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
-    const {
-      date,
-      actualCash,
-      varianceNotes,
-      notes,
-      // Summary data
-      totalRevenue,
-      orderRevenue,
-      otherRevenue,
-      revenueByChannel,
-      totalExpenses,
-      purchaseExpenses,
-      operatingExpenses,
-      payrollExpenses,
-      otherExpenses,
-      taxCollected,
-      taxPaid,
-      netTax,
-      netProfit,
-      totalOrders,
-      paidOrders,
-      refundedOrders,
-      pendingOrders,
-    } = body;
-
-    if (!date) {
-      return NextResponse.json({ error: 'Date is required' }, { status: 400 });
-    }
-
-    const reconciliationDate = new Date(date);
-    reconciliationDate.setHours(0, 0, 0, 0);
-
-    // Calculate expected cash and variance
-    const expectedCash = totalRevenue || 0;
-    const actualCashValue = actualCash !== undefined && actualCash !== null ? parseFloat(String(actualCash)) : null;
-    const cashVariance = actualCashValue !== null ? actualCashValue - expectedCash : null;
-
-    // Upsert reconciliation record
-    const reconciliation = await prisma.dailyReconciliation.upsert({
-      where: {
-        orgId_reconciliationDate: {
-          orgId,
-          reconciliationDate,
-        },
-      },
-      update: {
-        totalRevenue: totalRevenue || 0,
-        orderRevenue: orderRevenue || 0,
-        otherRevenue: otherRevenue || 0,
-        revenueByChannel: revenueByChannel || {},
-        totalExpenses: totalExpenses || 0,
-        purchaseExpenses: purchaseExpenses || 0,
-        operatingExpenses: operatingExpenses || 0,
-        payrollExpenses: payrollExpenses || 0,
-        otherExpenses: otherExpenses || 0,
-        taxCollected: taxCollected || 0,
-        taxPaid: taxPaid || 0,
-        netTax: netTax || 0,
-        netProfit: netProfit || 0,
-        totalOrders: totalOrders || 0,
-        paidOrders: paidOrders || 0,
-        refundedOrders: refundedOrders || 0,
-        pendingOrders: pendingOrders || 0,
-        status: 'confirmed',
-        confirmedBy: session.user.id,
-        confirmedAt: new Date(),
-        expectedCash,
-        actualCash: actualCashValue,
-        cashVariance,
-        varianceNotes: varianceNotes || null,
-        notes: notes || null,
-      },
-      create: {
-        orgId,
-        reconciliationDate,
-        totalRevenue: totalRevenue || 0,
-        orderRevenue: orderRevenue || 0,
-        otherRevenue: otherRevenue || 0,
-        revenueByChannel: revenueByChannel || {},
-        totalExpenses: totalExpenses || 0,
-        purchaseExpenses: purchaseExpenses || 0,
-        operatingExpenses: operatingExpenses || 0,
-        payrollExpenses: payrollExpenses || 0,
-        otherExpenses: otherExpenses || 0,
-        taxCollected: taxCollected || 0,
-        taxPaid: taxPaid || 0,
-        netTax: netTax || 0,
-        netProfit: netProfit || 0,
-        totalOrders: totalOrders || 0,
-        paidOrders: paidOrders || 0,
-        refundedOrders: refundedOrders || 0,
-        pendingOrders: pendingOrders || 0,
-        status: 'confirmed',
-        confirmedBy: session.user.id,
-        confirmedAt: new Date(),
-        expectedCash,
-        actualCash: actualCashValue,
-        cashVariance,
-        varianceNotes: varianceNotes || null,
-        notes: notes || null,
-      },
-    });
-
-    // Log audit
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: 'create',
-        resource: 'daily_reconciliation',
-        resourceId: reconciliation.id,
-        changes: {
-          date: reconciliationDate.toISOString().split('T')[0],
-          totalRevenue,
-          totalExpenses,
-          netProfit,
-          actualCash: actualCashValue,
-          cashVariance,
-        },
-        status: 'success',
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      reconciliation: {
-        id: reconciliation.id,
-        date: reconciliation.reconciliationDate,
-        status: reconciliation.status,
-        confirmedAt: reconciliation.confirmedAt,
-        netProfit: reconciliation.netProfit,
-        cashVariance: reconciliation.cashVariance,
-      },
-    });
-  } catch (error) {
-    console.error('[FINANCE_RECONCILIATION_POST]', error);
-    return NextResponse.json(
-      { error: 'Failed to confirm reconciliation' },
-      { status: 500 }
-    );
   }
 }
