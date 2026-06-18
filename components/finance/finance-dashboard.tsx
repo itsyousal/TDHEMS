@@ -728,6 +728,7 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Payment Method</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -753,6 +754,9 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
                     </TableCell>
                     <TableCell className={`text-right font-semibold ${getTransactionTypeColor(txn.type)}`}>
                       {txn.amount >= 0 ? '+' : ''}{formatCurrency(txn.amount)}
+                    </TableCell>
+                    <TableCell className="text-left">
+                      {txn.paymentMethod}
                     </TableCell>
                     {permissions.canManage && (
                       <TableCell className="text-right">
@@ -986,12 +990,12 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
                 <Select value={txnForm.paymentMethod} onValueChange={(val) => setTxnForm({...txnForm, paymentMethod: val})}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="upi">UPI</SelectItem>
-                    <SelectItem value="yousuf acc">Yousuf personal acc</SelectItem>
-                    <SelectItem value="zeerak acc">Zeerak personal acc</SelectItem>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Card">Card</SelectItem>
+                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="UPI">UPI</SelectItem>
+                    <SelectItem value="Yousuf personal acc">Yousuf personal acc</SelectItem>
+                    <SelectItem value="Zeerak personal acc">Zeerak personal acc</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
