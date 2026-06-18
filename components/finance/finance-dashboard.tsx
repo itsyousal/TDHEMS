@@ -990,6 +990,8 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
                     <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="yousuf acc">Yousuf personal acc</SelectItem>
+                    <SelectItem value="zeerak acc">Zeerak personal acc</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
