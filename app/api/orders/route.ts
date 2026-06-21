@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 
-const TAX_RATE = 0.05;
+// Tax should be provided by client as an absolute amount (taxAmount). Avoid using hardcoded constants here.
 
 export async function GET(request: Request) {
   try {
@@ -140,8 +140,9 @@ export async function POST(request: Request) {
       customerName?: string;      // New: for auto-creating customer
       customerEmail?: string;     // New: for auto-creating customer
       customerPhone?: string;     // New: for auto-creating customer
-      deliveryDate?: string;
-      discountAmount?: number;
+        deliveryDate?: string;
+        discountAmount?: number;
+        taxAmount?: number;
       notes?: string;
       paymentStatus?: string;
       items?: Array<{ skuId?: string; quantity?: number; unitPrice?: number; notes?: string }>;
@@ -221,7 +222,9 @@ export async function POST(request: Request) {
 
     const computedTotal = normalizedItems.reduce((sum: number, item: { totalPrice: number }) => sum + item.totalPrice, 0);
     const sanitizedDiscount = Math.max(0, Number(discountAmount ?? 0));
-    const computedTax = Number((computedTotal * TAX_RATE).toFixed(2));
+    // Use taxAmount from payload if provided (absolute value). Do not fall back to a constant tax rate.
+    const providedTax = typeof body.taxAmount === 'number' ? Number(body.taxAmount) : undefined;
+    const computedTax = providedTax !== undefined && !Number.isNaN(providedTax) ? providedTax : 0;
     const netAmount = Math.max(computedTotal + computedTax - sanitizedDiscount, 0);
 
     const order = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {

@@ -95,7 +95,6 @@ type MenuGroup = {
   items: MenuItem[];
 };
 
-const TAX_RATE = 0.05;
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
@@ -452,7 +451,8 @@ export default function CustomerOrderPage() {
     channelSourceId: '',
     deliveryDate: '',
     notes: '',
-    discount: '0',
+    discountPercent: '0',
+    taxRate: '5',
   });
   const [customer, setCustomer] = useState({ name: '', email: '', phone: '' });
   const [resolvedCustomerId, setResolvedCustomerId] = useState<string | null>(null);
@@ -558,8 +558,10 @@ export default function CustomerOrderPage() {
     }, 0);
   }, [items]);
 
-  const discountValue = Math.max(0, Number(formState.discount) || 0);
-  const taxAmount = Number((subtotal * TAX_RATE).toFixed(2));
+  const discountPercent = Math.max(0, Number(formState.discountPercent) || 0);
+  const discountValue = Number((subtotal * (discountPercent / 100)).toFixed(2));
+  const effectiveTaxRate = Number(formState.taxRate) || 0;
+  const taxAmount = Number((subtotal * (effectiveTaxRate / 100)).toFixed(2));
   const netAmount = Math.max(subtotal + taxAmount - discountValue, 0);
 
   const handleItemChange = (index: number, field: keyof OrderItemForm, value: string) => {
@@ -600,7 +602,7 @@ export default function CustomerOrderPage() {
       ...prev,
       deliveryDate: '',
       notes: '',
-      discount: '0',
+      discountPercent: '0',
     }));
     setCustomer({ name: '', email: '', phone: '' });
     setResolvedCustomerId(null);
@@ -832,7 +834,8 @@ export default function CustomerOrderPage() {
         customerId,
         deliveryDate: formState.deliveryDate || undefined,
         notes: formState.notes.trim() || undefined,
-        discountAmount: Number(formState.discount) || 0,
+        discountAmount: discountValue,
+        taxAmount: taxAmount,
         items: validItems,
       };
 
@@ -1218,9 +1221,16 @@ export default function CustomerOrderPage() {
                     <span className="text-gray-500">Subtotal</span>
                     <span className="font-medium">{formatCurrency(subtotal)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Tax (5%)</span>
-                    <span className="font-medium">{formatCurrency(taxAmount)}</span>
+                  
+                  <div className="grid grid-cols-2 gap-2 items-end">
+                    <div>
+                      <label className="text-xs text-gray-600">Discount (%)</label>
+                      <Input type="number" step="0.01" value={formState.discountPercent} onChange={e => setFormState(prev => ({ ...prev, discountPercent: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Tax rate (%)</label>
+                      <Input type="number" step="0.01" value={formState.taxRate} onChange={e => setFormState(prev => ({ ...prev, taxRate: e.target.value }))} />
+                    </div>
                   </div>
                   {discountValue > 0 && (
                     <div className="flex justify-between text-sm text-green-600">

@@ -26,6 +26,31 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [printOrderId, setPrintOrderId] = useState<string | null>(null);
+  const [editingOrder, setEditingOrder] = useState<OrderSummary | null>(null);
+
+  const openEditor = (order: OrderSummary) => {
+    setEditingOrder(order);
+  };
+
+  const closeEditor = () => setEditingOrder(null);
+
+  const saveEdits = async (updated: any) => {
+    try {
+      const res = await fetch(`/api/orders/${updated.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated.payload),
+      });
+      if (!res.ok) throw new Error('Failed to save order edits');
+      const body = await res.json();
+      setOrders((prev) => prev.map((o) => (o.id === body.id ? body : o)));
+      toast.success('Order updated');
+      closeEditor();
+    } catch (err) {
+      console.error('Save edits failed', err);
+      toast.error(err instanceof Error ? err.message : 'Unable to save edits');
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -156,6 +181,9 @@ export default function OrdersPage() {
                     >
                       Print bill
                     </Button>
+                    <Button type="button" size="sm" variant="ghost" className="no-print ml-2" onClick={() => openEditor(order)}>
+                      Edit
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -226,6 +254,92 @@ export default function OrdersPage() {
           );
         })()
       )}
+      {editingOrder && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-6">
+          <div className="w-full max-w-3xl bg-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Order #{editingOrder.orderNumber}</h3>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => closeEditor()}>Close</Button>
+              </div>
+            </div>
+
+            <EditOrderForm order={editingOrder} onCancel={closeEditor} onSave={saveEdits} />
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+function EditOrderForm({ order, onCancel, onSave }: { order: OrderSummary; onCancel: () => void; onSave: (arg0: any) => void }) {
+  const [items, setItems] = useState(order.items?.map(it => ({ id: it.id, skuId: it.sku?.name || it.id, quantity: it.quantity, unitPrice: it.totalPrice / it.quantity })) || []);
+  const [discount, setDiscount] = useState(0);
+  const [tax, setTax] = useState(0);
+  const [status, setStatus] = useState(order.status);
+
+  useEffect(() => {
+    setDiscount((order as any).discountAmount || 0);
+    setTax((order as any).taxAmount || 0);
+  }, [order]);
+
+  const updateItem = (index: number, field: 'quantity' | 'unitPrice', value: number) => {
+    setItems(prev => prev.map((it, i) => i === index ? { ...it, [field]: value } : it));
+  };
+
+  const handleSave = () => {
+    const payload: any = { status };
+    // send updated discount/tax
+    payload.discountAmount = Number(discount) || 0;
+    payload.taxAmount = Number(tax) || 0;
+    // map items to expected shape if modified
+    payload.items = items.map(it => ({ skuId: it.skuId, quantity: Number(it.quantity), unitPrice: Number(it.unitPrice) }));
+    onSave({ id: order.id, payload });
+  };
+
+  return (
+    <div>
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Status</label>
+          <select value={status} onChange={e => setStatus(e.target.value)} className="mt-1 block w-full rounded border-gray-200">
+            <option value="pending">pending</option>
+            <option value="shipped">shipped</option>
+            <option value="delivered">delivered</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Discount</label>
+          <input type="number" step="0.01" value={discount} onChange={e => setDiscount(Number(e.target.value))} className="mt-1 block w-full rounded border-gray-200 p-2" />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Tax Amount</label>
+          <input type="number" step="0.01" value={tax} onChange={e => setTax(Number(e.target.value))} className="mt-1 block w-full rounded border-gray-200 p-2" />
+        </div>
+
+        <div>
+          <p className="text-sm font-medium">Items</p>
+          <div className="space-y-2 mt-2">
+            {items.map((it, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <div className="flex-1">
+                  <div className="text-sm font-medium">{it.skuId}</div>
+                </div>
+                <input type="number" value={it.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} className="w-20 p-1 rounded border-gray-200" />
+                <input type="number" step="0.01" value={it.unitPrice} onChange={e => updateItem(idx, 'unitPrice', Number(e.target.value))} className="w-28 p-1 rounded border-gray-200" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-4">
+          <Button onClick={handleSave}>Save changes</Button>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        </div>
+      </div>
+    </div>
   );
 }
