@@ -12,8 +12,10 @@ const REDIS_URL = process.env.REDIS_URL || process.env.NEXT_REDIS_URL || '';
 if (REDIS_URL) {
   try {
     // Lazy require to avoid dev-time dependency when not used
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const IORedis = require('ioredis');
+    // Use eval('require') to avoid bundler static analysis attempting to resolve the module
+    // when it's not installed in dev environments.
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const IORedis = eval('require')('ioredis');
     redisClient = new IORedis(REDIS_URL);
     redisClient.on('error', (err: any) => console.warn('Redis error', err));
     console.log('Cache: using Redis at', REDIS_URL);
@@ -69,8 +71,21 @@ export async function cacheDel(key: string) {
 export async function cacheDelPrefix(prefix: string) {
   if (redisClient) {
     try {
-      const keys = await redisClient.keys(`${prefix}*`);
-      if (keys && keys.length) await redisClient.del(...keys);
+      // Use SCAN loop to avoid blocking Redis with KEYS on large keyspaces.
+      let cursor = '0';
+      do {
+        // scan returns [nextCursor, keys]
+        const res = await redisClient.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100);
+        cursor = res[0];
+        const keys = res[1] || [];
+        if (keys.length) {
+          // split into chunks to avoid argument list too long
+          for (let i = 0; i < keys.length; i += 100) {
+            const chunk = keys.slice(i, i + 100);
+            await redisClient.del(...chunk);
+          }
+        }
+      } while (cursor !== '0');
       return;
     } catch (err) {
       console.warn('cacheDelPrefix redis failed', err);

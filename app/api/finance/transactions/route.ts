@@ -171,56 +171,61 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate transaction number
+    // Generate transaction number without a table-wide count to avoid full scans.
+    // Uses date + high-resolution timestamp + random suffix to keep it human-inspectable
+    // and unique without expensive DB queries.
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-    const count = await prisma.financialTransaction.count({
-      where: {
-        orgId,
-        transactionNumber: { startsWith: `TXN-${dateStr}` },
-      },
-    });
-    const transactionNumber = `TXN-${dateStr}-${String(count + 1).padStart(5, '0')}`;
+    const timeSuffix = String(Date.now()).slice(-8);
+    const randSuffix = Math.floor(Math.random() * 900 + 100); // 3-digit random
+    const transactionNumber = `TXN-${dateStr}-${timeSuffix}-${randSuffix}`;
 
     // Calculate net amount
     const numericAmount = parseFloat(String(amount));
     const numericTax = parseFloat(String(taxAmount)) || 0;
     const netAmount = numericAmount + numericTax;
 
-    const transaction = await prisma.financialTransaction.create({
-      data: {
-        orgId,
-        transactionNumber,
-        type,
-        category,
-        subCategory: subCategory || null,
-        amount: numericAmount,
-        taxAmount: numericTax,
-        netAmount,
-        description: description || null,
-        notes: notes || null,
-        paymentMethod: paymentMethod || null,
-        paymentReference: paymentReference || null,
-        paymentStatus: 'completed',
-        transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-        createdBy: session.user.id,
-      },
-    });
+    const transaction = await measureAsync('finance.transactions.createTransaction', async () =>
+      prisma.financialTransaction.create({
+        data: {
+          orgId,
+          transactionNumber,
+          type,
+          category,
+          subCategory: subCategory || null,
+          amount: numericAmount,
+          taxAmount: numericTax,
+          netAmount,
+          description: description || null,
+          notes: notes || null,
+          paymentMethod: paymentMethod || null,
+          paymentReference: paymentReference || null,
+          paymentStatus: 'completed',
+          transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+          createdBy: session.user.id,
+        },
+      }),
+    );
 
-    // Log audit
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.id,
-        action: 'create',
-        resource: 'financial_transaction',
-        resourceId: transaction.id,
-        changes: { transactionNumber, type, category, amount: numericAmount },
-        status: 'success',
-      },
-    });
+    // Fire-and-forget audit log and cache invalidation so the API returns fast.
+    // These run in background and we intentionally do not await them.
+    measureAsync('finance.transactions.createAuditLog', async () =>
+      prisma.auditLog.create({
+        data: {
+          userId: session.user?.id || null,
+          action: 'create',
+          resource: 'financial_transaction',
+          resourceId: transaction.id,
+          changes: { transactionNumber, type, category, amount: numericAmount },
+          status: 'success',
+        },
+      }),
+    ).catch((err) => console.warn('audit log failed', err));
 
-    // Invalidate finance caches for this org
-    await cacheDelPrefix(`finance:${orgId}:`);
+    // Invalidate finance caches for this org asynchronously
+    measureAsync('finance.transactions.cacheDelPrefix', async () => cacheDelPrefix(`finance:${orgId}:`)).catch((err) =>
+      console.warn('cacheDelPrefix failed', err),
+    );
 
     return NextResponse.json(transaction, { status: 201 });
   } catch (error) {

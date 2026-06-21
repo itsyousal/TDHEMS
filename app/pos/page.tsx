@@ -72,6 +72,11 @@ export default function PointOfSalePage() {
       }
       const payload = await response.json();
       setOrders(payload.data || []);
+      // If the currently selected order has disappeared from the latest fetch,
+      // clear the focused selection to avoid showing an empty focused pane.
+      if (selectedOrderId && !(payload.data || []).some((o: any) => o.id === selectedOrderId)) {
+        setSelectedOrderId(null);
+      }
       setError(null);
     } catch (err) {
       console.error('[POS] fetch orders', err);

@@ -445,6 +445,8 @@ export default function CustomerOrderPage() {
   const [menuLoading, setMenuLoading] = useState(true);
   const [menuError, setMenuError] = useState<string | null>(null);
   const [items, setItems] = useState<OrderItemForm[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<OrderItemForm | null>(null);
   const [formState, setFormState] = useState({
     locationId: '',
     channelSourceId: '',
@@ -630,19 +632,31 @@ export default function CustomerOrderPage() {
     
     const addonsText = addonNames.length > 0 ? addonNames.join(', ') : '';
     
-    // Always add as new item (even if exists) to preserve different addon combinations
-    setItems((prev) => [
-      ...prev,
-      {
-        skuId: menuItem.id,
-        quantity: '1',
-        unitPrice: String(unitPrice),
-        addons: addonsText,
-        addonPreset: 'none',
-        name: menuItem.name,
-      },
-    ]);
-    
+    // Merge identical items (same sku + same addons) by incrementing quantity.
+    setItems((prev) => {
+      const matchIndex = prev.findIndex(
+        (it) => it.skuId === menuItem.id && (it.addons || '') === addonsText
+      );
+      if (matchIndex !== -1) {
+        return prev.map((it, idx) => {
+          if (idx !== matchIndex) return it;
+          const newQty = Math.max(1, (Number(it.quantity) || 1) + 1);
+          return { ...it, quantity: String(newQty) };
+        });
+      }
+      return [
+        ...prev,
+        {
+          skuId: menuItem.id,
+          quantity: '1',
+          unitPrice: String(unitPrice),
+          addons: addonsText,
+          addonPreset: 'none',
+          name: menuItem.name,
+        },
+      ];
+    });
+
     const addonMsg = addonsText ? ` with ${addonsText}` : '';
     toast.success(`${menuItem.name}${addonMsg} added to cart`);
   };
@@ -1052,14 +1066,58 @@ export default function CustomerOrderPage() {
                   <div className="space-y-3 max-h-[45vh] overflow-auto pr-1">
                     {items.map((item, index) => {
                       const sku = meta.skus.find((s) => s.id === item.skuId);
+                      if (editingIndex === index && editForm) {
+                        return (
+                          <div key={`${item.skuId}-${index}`} className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                            <div className="grid grid-cols-1 gap-3">
+                              <div>
+                                <label className="text-sm font-medium">Item</label>
+                                <div className="mt-1 text-gray-900 font-medium">{sku?.name || item.name}</div>
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Quantity</label>
+                                <Input value={editForm.quantity} onChange={(e) => setEditForm({...editForm, quantity: e.target.value})} />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Unit price</label>
+                                <Input value={editForm.unitPrice} onChange={(e) => setEditForm({...editForm, unitPrice: e.target.value})} />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Add-ons / Notes</label>
+                                <Input value={editForm.addons} onChange={(e) => setEditForm({...editForm, addons: e.target.value})} />
+                              </div>
+                              <div className="flex gap-2 mt-2">
+                                <Button type="button" onClick={() => {
+                                  // save
+                                  setItems(prev => prev.map((it, i) => i === index ? editForm as OrderItemForm : it));
+                                  setEditingIndex(null);
+                                  setEditForm(null);
+                                }}>
+                                  Save
+                                </Button>
+                                <Button type="button" variant="outline" onClick={() => { setEditingIndex(null); setEditForm(null); }}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
-                        <CartItem
-                          key={`${item.skuId}-${index}`}
-                          item={item}
-                          sku={sku}
-                          onUpdateQuantity={(delta) => updateItemQuantity(index, delta)}
-                          onRemove={() => removeItem(index)}
-                        />
+                        <div key={`${item.skuId}-${index}`}>
+                          <CartItem
+                            item={item}
+                            sku={sku}
+                            onUpdateQuantity={(delta) => updateItemQuantity(index, delta)}
+                            onRemove={() => removeItem(index)}
+                          />
+                          <div className="mt-2 flex gap-2">
+                            <Button size="sm" onClick={() => { setEditingIndex(index); setEditForm(item); }}>
+                              Edit
+                            </Button>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
