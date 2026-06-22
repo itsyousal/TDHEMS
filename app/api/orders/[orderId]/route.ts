@@ -18,6 +18,9 @@ export async function PATCH(
     const payload = (await request.json()) as {
       status?: string;
       paymentStatus?: string;
+      paymentMethod?: string;
+      paymentReference?: string;
+      transactionDate?: string | null;
       discountAmount?: number | null;
       taxAmount?: number | null;
       items?: Array<{ skuId: string; quantity: number; unitPrice: number; notes?: string }>;
@@ -102,15 +105,80 @@ export async function PATCH(
         data.netAmount = Math.max(total + tax - Math.max(0, discount), 0);
       }
 
-      updatedOrder = await prisma.order.update({
-        where: { id: orderId },
-        data,
-        include: {
-          customer: true,
-          channelSource: true,
-          items: { include: { sku: true } },
-        },
-      });
+      // If payment status changed to paid, update/create the related financial transaction
+      if (data.paymentStatus === 'paid') {
+        // perform update and transaction upsert atomically
+        updatedOrder = await prisma.$transaction(async (tx) => {
+          const u = await tx.order.update({
+            where: { id: orderId },
+            data,
+            include: {
+              customer: true,
+              channelSource: true,
+              items: { include: { sku: true } },
+            },
+          });
+
+          // Find existing financial transaction for this order
+          const existingTxn = await tx.financialTransaction.findFirst({
+            where: { orgId, referenceType: 'order', referenceId: orderId },
+          });
+
+          const txnDate = payload.transactionDate ? new Date(payload.transactionDate) : new Date();
+          const paymentMethod = payload.paymentMethod || 'cash';
+
+          if (existingTxn) {
+            await tx.financialTransaction.update({
+              where: { id: existingTxn.id },
+              data: {
+                paymentMethod,
+                paymentStatus: 'completed',
+                paymentReference: payload.paymentReference || existingTxn.paymentReference,
+                transactionDate: txnDate,
+              },
+            });
+          } else {
+            // create a minimal financial transaction linked to this order
+            const today = new Date();
+            const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+            const rand = Math.floor(Math.random() * 900 + 100);
+            const transactionNumber = `TXN-${dateStr}-${Date.now()}-${rand}`;
+            await tx.financialTransaction.create({
+              data: {
+                orgId,
+                transactionNumber,
+                type: 'revenue',
+                category: 'sales',
+                subCategory: u.channelSource?.name || 'order',
+                amount: u.netAmount,
+                taxAmount: u.taxAmount || 0,
+                netAmount: u.netAmount,
+                referenceType: 'order',
+                referenceId: u.id,
+                paymentMethod,
+                paymentStatus: 'completed',
+                paymentReference: payload.paymentReference || null,
+                description: `Order ${u.orderNumber} - ${u.customer?.name || 'Guest'}`,
+                transactionDate: txnDate,
+                createdBy: session.user.id,
+                approvalStatus: 'approved',
+              },
+            });
+          }
+
+          return u;
+        });
+      } else {
+        updatedOrder = await prisma.order.update({
+          where: { id: orderId },
+          data,
+          include: {
+            customer: true,
+            channelSource: true,
+            items: { include: { sku: true } },
+          },
+        });
+      }
     }
 
     return NextResponse.json(updatedOrder);

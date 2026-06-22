@@ -161,10 +161,18 @@ export default function PointOfSalePage() {
     event.preventDefault();
     if (!paymentModalOrder) return;
     try {
+      const body: any = {
+        paymentStatus: 'paid',
+      };
+      // Include payment metadata when available
+      if (paymentMode) body.paymentMethod = paymentMode;
+      if (transactionId) body.paymentReference = transactionId;
+      if (transactionDate) body.transactionDate = transactionDate;
+
       const response = await fetch(`/api/orders/${paymentModalOrder.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentStatus: 'paid' }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         throw new Error('Unable to save payment info');
