@@ -87,16 +87,11 @@ export default function PointOfSalePage() {
   };
 
   useEffect(() => {
+    // Load orders once on mount. Automatic polling and broadcast-driven reloads
+    // were removed so the POS only refreshes when the user clicks Refresh.
     loadOrders();
-    const interval = setInterval(loadOrders, 15000);
-    let channel: BroadcastChannel | null = null;
-    if (typeof window !== 'undefined') {
-      channel = new BroadcastChannel('pos-orders');
-      channel.addEventListener('message', () => loadOrders());
-    }
     return () => {
-      clearInterval(interval);
-      channel?.close();
+      // no-op cleanup
     };
   }, []);
 
