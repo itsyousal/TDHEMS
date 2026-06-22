@@ -80,6 +80,10 @@ interface FinanceDashboardProps {
     canReconcile: boolean;
     canManage: boolean;
   };
+  initialStats?: FinanceStats | null;
+  initialTransactions?: Transaction[];
+  initialReconciliation?: DailyReconciliation | null;
+  isSuperAdmin?: boolean;
 }
 
 interface FinanceStats {
@@ -141,9 +145,9 @@ interface Transaction {
   referenceType?: string;
 }
 
-export default function FinanceDashboard({ permissions }: FinanceDashboardProps) {
-  const [stats, setStats] = useState<FinanceStats | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+export default function FinanceDashboard({ permissions, initialStats = null, initialTransactions = [], initialReconciliation = null, isSuperAdmin = false }: FinanceDashboardProps) {
+  const [stats, setStats] = useState<FinanceStats | null>(initialStats);
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions || []);
   const [reconciliation, setReconciliation] = useState<DailyReconciliation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReconciling, setIsReconciling] = useState(false);
@@ -166,9 +170,9 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
 
   // Coalesced fetch: fetch stats, transactions and reconciliation together to avoid duplicate
   // network requests. Keeps existing endpoints and response mappings intact.
-  const fetchDashboardData = useCallback(async (opts?: { period?: string; txnFilter?: string }) => {
+  const fetchDashboardData = useCallback(async (opts?: { period?: string; txnFilter?: string; silent?: boolean }) => {
     try {
-      setIsLoading(true);
+      if (!opts?.silent) setIsLoading(true);
       const apiPeriod = (opts?.period ?? selectedPeriod) === 'today' ? 'day' : (opts?.period ?? selectedPeriod);
 
       const txParams = new URLSearchParams({ limit: '10' });
@@ -254,9 +258,18 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
     }
   }, [selectedPeriod, transactionFilter]);
 
+  // Only fetch on mount if we don't have initial transactions/stats
   useEffect(() => {
-    if (permissions.canView) fetchDashboardData();
-  }, [permissions.canView, fetchDashboardData]);
+    if (!permissions.canView) return;
+    const needFetch = (!initialTransactions || initialTransactions.length === 0) && !initialStats;
+    if (needFetch) fetchDashboardData();
+    else {
+      // populate reconciliation from initial prop if provided
+      if (initialReconciliation) setReconciliation(initialReconciliation);
+      // ensure loading flag is off
+      setIsLoading(false);
+    }
+  }, [permissions.canView, fetchDashboardData, initialTransactions, initialStats, initialReconciliation]);
 
   const handleConfirmReconciliation = async () => {
     if (!permissions.canReconcile) {
@@ -320,6 +333,7 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
         throw new Error(err.error || `Failed to ${editingTransaction ? 'update' : 'create'} transaction`);
       }
 
+      const created = await res.json();
       toast.success(`Transaction ${editingTransaction ? 'updated' : 'created'} successfully`);
       setShowTransactionModal(false);
       setEditingTransaction(null);
@@ -332,12 +346,37 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
         paymentMethod: 'cash',
         transactionDate: new Date().toISOString().slice(0, 10),
       });
-      // Refresh consolidated dashboard data
-      fetchDashboardData();
+      // Optimistically update transactions list locally so UI doesn't reload
+      if (editingTransaction) {
+        setTransactions((prev) => prev.map((t) => (t.id === created.id ? created : t)));
+      } else {
+        setTransactions((prev) => [created, ...prev].slice(0, 50));
+      }
+
+      // Refresh consolidated dashboard data in background (quiet)
+      fetchDashboardData({ silent: true }).catch(() => {});
     } catch (error: any) {
       toast.error(error.message);
     } finally {
       setIsSubmittingTxn(false);
+    }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!isSuperAdmin) return toast.error('Only superadmins can delete transactions');
+    try {
+      const res = await fetch(`/api/finance/transactions/${id}`, { method: 'DELETE' });
+      if (res.status === 204) {
+        setTransactions((prev) => prev.filter((t) => t.id !== id));
+        toast.success('Transaction deleted');
+        // refresh stats quietly
+        fetchDashboardData({ silent: true }).catch(() => {});
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Failed' }));
+        throw new Error(err.error || 'Failed to delete transaction');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete transaction');
     }
   };
 
@@ -703,6 +742,7 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Payment Method</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -732,34 +772,46 @@ export default function FinanceDashboard({ permissions }: FinanceDashboardProps)
                     <TableCell className="text-left">
                       {txn.paymentMethod}
                     </TableCell>
-                    {permissions.canManage && (
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => {
-                            setEditingTransaction(txn);
-                            setTxnForm({
-                              type: txn.type,
-                              category: txn.category,
-                              amount: Math.abs(txn.amount).toString(),
-                              taxAmount: (txn.taxAmount || 0).toString(),
-                              description: txn.description || '',
-                              paymentMethod: txn.paymentMethod || 'cash',
-                              transactionDate: new Date(txn.transactionDate).toISOString().slice(0, 10),
-                            });
-                            setShowTransactionModal(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    )}
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {permissions.canManage && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingTransaction(txn);
+                              setTxnForm({
+                                type: txn.type,
+                                category: txn.category,
+                                amount: Math.abs(txn.amount).toString(),
+                                taxAmount: (txn.taxAmount || 0).toString(),
+                                description: txn.description || '',
+                                paymentMethod: txn.paymentMethod || 'cash',
+                                transactionDate: new Date(txn.transactionDate).toISOString().slice(0, 10),
+                              });
+                              setShowTransactionModal(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {isSuperAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteTransaction(txn.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No transactions found
                   </TableCell>
                 </TableRow>

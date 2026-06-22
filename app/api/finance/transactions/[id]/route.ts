@@ -112,11 +112,19 @@ export async function DELETE(
 
     const orgId = session.user.organizationId;
 
-    // Check permission - require finance.manage for deleting transactions
-    const canManage = await hasPermission(session.user.id, 'finance.manage', orgId);
-    if (!canManage) {
+    // Only allow superadmin role to delete transactions
+    const isSuperAdmin = await prisma.userRole.findFirst({
+      where: {
+        userId: session.user.id,
+        orgId,
+        role: { slug: 'owner-super-admin' },
+      },
+      include: { role: true },
+    });
+
+    if (!isSuperAdmin) {
       return NextResponse.json(
-        { error: 'Access denied. Finance manage permission required.' },
+        { error: 'Access denied. Only superadmins can delete transactions.' },
         { status: 403 }
       );
     }

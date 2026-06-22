@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 import FinanceDashboard from '@/components/finance/finance-dashboard';
+import { getUserRoles } from '@/lib/rbac';
 import { AccessDenied } from '@/components/access-denied';
 import { RefreshCw } from 'lucide-react';
 
@@ -49,6 +50,21 @@ async function FinancePage() {
     canManage: permResult.canManage === true,
   };
 
+  // Determine if user is superadmin (role slug: owner-super-admin)
+  const roles = await getUserRoles(userId, orgId);
+  const isSuperAdmin = roles.some((ur: any) => ur.role?.slug === 'owner-super-admin');
+
+  // Server-side fetch initial dashboard data so the client renders immediately
+  const today = new Date().toISOString().slice(0, 10);
+  const base = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+  const statsRes = await fetch(new URL(`/api/finance/stats?period=day`, base).toString());
+  const txRes = await fetch(new URL(`/api/finance/transactions?limit=10`, base).toString());
+  const reconRes = await fetch(new URL(`/api/finance/reconciliation?date=${today}`, base).toString());
+
+  const initialStats = statsRes.ok ? await statsRes.json().catch(() => null) : null;
+  const initialTx = txRes.ok ? await txRes.json().catch(() => null) : null;
+  const initialRecon = reconRes.ok ? await reconRes.json().catch(() => null) : null;
+
   // Check if user has at least view permission
   if (!permissions.canView) {
     return (
@@ -69,7 +85,22 @@ async function FinancePage() {
         </p>
       </div>
 
-      <FinanceDashboard permissions={permissions} />
+      <FinanceDashboard
+        permissions={permissions}
+        initialStats={initialStats?.summary ? {
+          totalRevenue: initialStats.summary.totalRevenue || 0,
+          totalExpenses: initialStats.summary.totalExpenses || 0,
+          netProfit: initialStats.summary.netProfit || 0,
+          pendingInvoices: initialStats.counts?.pendingReconciliations || 0,
+          overdueInvoices: 0,
+          revenueByChannel: initialStats.revenueByChannel || [],
+          expensesByCategory: initialStats.expensesByCategory || [],
+          comparison: initialStats.trends || { revenueChange: 0, expenseChange: 0, profitChange: 0 },
+        } : null}
+        initialTransactions={initialTx?.data || []}
+        initialReconciliation={initialRecon || null}
+        isSuperAdmin={isSuperAdmin}
+      />
     </>
   );
 }

@@ -227,97 +227,128 @@ export async function POST(request: Request) {
     const computedTax = providedTax !== undefined && !Number.isNaN(providedTax) ? providedTax : 0;
     const netAmount = Math.max(computedTotal + computedTax - sanitizedDiscount, 0);
 
-    const order = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const createdOrder = await tx.order.create({
-        data: {
-          orgId,
-          locationId,
-          channelSourceId,
-          customerId: validatedCustomerId,
-          deliveryDate: parsedDeliveryDate,
-          notes,
-          status: 'pending',
-          paymentStatus: paymentStatus || 'pending',
-          totalAmount: computedTotal,
-          netAmount,
-          taxAmount: computedTax,
-          discountAmount: sanitizedDiscount,
-          orderNumber: `ORD-${Date.now()}`,
-          items: {
-            create: normalizedItems,
-          },
-        },
-        include: {
-          customer: true,
-          channelSource: true,
-          items: {
-            include: { sku: true },
-          },
-        },
-      });
+    // Attempt create with retries for unique orderNumber collisions (Prisma P2002)
+    const maxAttempts = 3;
+    let lastError: any = null;
+    let order: any = null;
 
-      // Update customer lifetime value and last order date
-      if (validatedCustomerId) {
-        await tx.customer.update({
-          where: { id: validatedCustomerId },
-          data: {
-            lifetimeValue: { increment: netAmount },
-            lastOrderDate: parsedDeliveryDate ?? new Date(),
-          },
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const now = Date.now();
+        const rand = Math.floor(Math.random() * 900 + 100); // 3-digit random
+        const orderNumber = `ORD-${now}-${rand}`;
+
+        order = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+          const createdOrder = await tx.order.create({
+            data: {
+              orgId,
+              locationId,
+              channelSourceId,
+              customerId: validatedCustomerId,
+              deliveryDate: parsedDeliveryDate,
+              notes,
+              status: 'pending',
+              paymentStatus: paymentStatus || 'pending',
+              totalAmount: computedTotal,
+              netAmount,
+              taxAmount: computedTax,
+              discountAmount: sanitizedDiscount,
+              orderNumber,
+              items: {
+                create: normalizedItems,
+              },
+            },
+            include: {
+              customer: true,
+              channelSource: true,
+              items: {
+                include: { sku: true },
+              },
+            },
+          });
+
+          // Update customer lifetime value and last order date
+          if (validatedCustomerId) {
+            await tx.customer.update({
+              where: { id: validatedCustomerId },
+              data: {
+                lifetimeValue: { increment: netAmount },
+                lastOrderDate: parsedDeliveryDate ?? new Date(),
+              },
+            });
+
+            // Also create a purchase interaction to track this order in CRM
+            await tx.customerInteraction.create({
+              data: {
+                customerId: validatedCustomerId,
+                type: 'purchase',
+                subject: `Order ${createdOrder.orderNumber}`,
+                notes: `Order placed for ₹${netAmount.toLocaleString('en-IN')}`,
+                outcome: 'pending',
+              },
+            });
+          }
+
+          // Auto-record financial transaction for this order
+          const today = new Date();
+          const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+          const txnCount = await tx.financialTransaction.count({
+            where: {
+              orgId,
+              transactionNumber: { startsWith: `TXN-${dateStr}` },
+            },
+          });
+          const transactionNumber = `TXN-${dateStr}-${String(txnCount + 1).padStart(5, '0')}`;
+
+          await tx.financialTransaction.create({
+            data: {
+              orgId,
+              transactionNumber,
+              type: 'revenue',
+              category: 'sales',
+              subCategory: createdOrder.channelSource?.name || 'order',
+              amount: netAmount,
+              taxAmount: computedTax,
+              netAmount: netAmount,
+              referenceType: 'order',
+              referenceId: createdOrder.id,
+              paymentMethod: paymentStatus === 'paid' ? 'online' : null,
+              paymentStatus: paymentStatus === 'paid' ? 'completed' : 'pending',
+              description: `Order ${createdOrder.orderNumber} - ${createdOrder.customer?.name || 'Guest'}`,
+              transactionDate: parsedDeliveryDate || new Date(),
+              createdBy: session.user.id,
+              approvalStatus: 'approved', // Revenue auto-approved
+            },
+          });
+
+          return createdOrder;
         });
 
-        // Also create a purchase interaction to track this order in CRM
-        await tx.customerInteraction.create({
-          data: {
-            customerId: validatedCustomerId,
-            type: 'purchase',
-            subject: `Order ${createdOrder.orderNumber}`,
-            notes: `Order placed for ₹${netAmount.toLocaleString('en-IN')}`,
-            outcome: 'pending',
-          },
-        });
+        // success
+        break;
+      } catch (err: any) {
+        lastError = err;
+        // Prisma unique constraint failed error code P2002
+        if (err?.code === 'P2002' && attempt < maxAttempts) {
+          // collision - retry with a new orderNumber
+          continue;
+        }
+        // other errors - rethrow
+        throw err;
       }
+    }
 
-      // Auto-record financial transaction for this order
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-      const txnCount = await tx.financialTransaction.count({
-        where: {
-          orgId,
-          transactionNumber: { startsWith: `TXN-${dateStr}` },
-        },
-      });
-      const transactionNumber = `TXN-${dateStr}-${String(txnCount + 1).padStart(5, '0')}`;
-
-      await tx.financialTransaction.create({
-        data: {
-          orgId,
-          transactionNumber,
-          type: 'revenue',
-          category: 'sales',
-          subCategory: createdOrder.channelSource?.name || 'order',
-          amount: netAmount,
-          taxAmount: computedTax,
-          netAmount: netAmount,
-          referenceType: 'order',
-          referenceId: createdOrder.id,
-          paymentMethod: paymentStatus === 'paid' ? 'online' : null,
-          paymentStatus: paymentStatus === 'paid' ? 'completed' : 'pending',
-          description: `Order ${createdOrder.orderNumber} - ${createdOrder.customer?.name || 'Guest'}`,
-          transactionDate: parsedDeliveryDate || new Date(),
-          createdBy: session.user.id,
-          approvalStatus: 'approved', // Revenue auto-approved
-        },
-      });
-
-      return createdOrder;
-    });
+    if (!order && lastError) {
+      throw lastError;
+    }
 
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
     console.error('Error creating order:', error);
+    // Return the underlying error message to the client for easier debugging.
+    const msg = error instanceof Error ? error.message : 'Failed to create order';
     return NextResponse.json(
-      { error: 'Failed to create order' },
+      { error: msg },
       { status: 500 }
     );
   }
