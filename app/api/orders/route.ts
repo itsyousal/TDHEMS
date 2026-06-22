@@ -290,36 +290,47 @@ export async function POST(request: Request) {
           }
 
           // Auto-record financial transaction for this order
+          // Create a collision-resistant transaction number and retry on rare collisions
           const today = new Date();
           const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-          const txnCount = await tx.financialTransaction.count({
-            where: {
-              orgId,
-              transactionNumber: { startsWith: `TXN-${dateStr}` },
-            },
-          });
-          const transactionNumber = `TXN-${dateStr}-${String(txnCount + 1).padStart(5, '0')}`;
-
-          await tx.financialTransaction.create({
-            data: {
-              orgId,
-              transactionNumber,
-              type: 'revenue',
-              category: 'sales',
-              subCategory: createdOrder.channelSource?.name || 'order',
-              amount: netAmount,
-              taxAmount: computedTax,
-              netAmount: netAmount,
-              referenceType: 'order',
-              referenceId: createdOrder.id,
-              paymentMethod: paymentStatus === 'paid' ? 'online' : null,
-              paymentStatus: paymentStatus === 'paid' ? 'completed' : 'pending',
-              description: `Order ${createdOrder.orderNumber} - ${createdOrder.customer?.name || 'Guest'}`,
-              transactionDate: parsedDeliveryDate || new Date(),
-              createdBy: session.user.id,
-              approvalStatus: 'approved', // Revenue auto-approved
-            },
-          });
+          let txnCreated = null;
+          const maxTxnAttempts = 3;
+          for (let tAttempt = 1; tAttempt <= maxTxnAttempts; tAttempt++) {
+            try {
+              const rand = Math.floor(Math.random() * 900 + 100);
+              const transactionNumber = `TXN-${dateStr}-${Date.now()}-${rand}`;
+              txnCreated = await tx.financialTransaction.create({
+                data: {
+                  orgId,
+                  transactionNumber,
+                  type: 'revenue',
+                  category: 'sales',
+                  subCategory: createdOrder.channelSource?.name || 'order',
+                  amount: netAmount,
+                  taxAmount: computedTax,
+                  netAmount: netAmount,
+                  referenceType: 'order',
+                  referenceId: createdOrder.id,
+                  paymentMethod: paymentStatus === 'paid' ? 'online' : null,
+                  paymentStatus: paymentStatus === 'paid' ? 'completed' : 'pending',
+                  description: `Order ${createdOrder.orderNumber} - ${createdOrder.customer?.name || 'Guest'}`,
+                  transactionDate: parsedDeliveryDate || new Date(),
+                  createdBy: session.user.id,
+                  approvalStatus: 'approved', // Revenue auto-approved
+                },
+              });
+              break;
+            } catch (txErr: any) {
+              // If unique constraint collision, retry with a new random suffix
+              if (txErr?.code === 'P2002' && tAttempt < maxTxnAttempts) {
+                continue;
+              }
+              throw txErr;
+            }
+          }
+          if (!txnCreated) {
+            throw new Error('Failed to create financial transaction for order');
+          }
 
           return createdOrder;
         });
