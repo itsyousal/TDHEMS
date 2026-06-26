@@ -79,110 +79,87 @@ export async function GET(request: Request) {
           previousEndDate = new Date(startDate);
       }
 
-      // Fetch financial data sequentially to avoid connection pool exhaustion
-      const currentRevenue = await prisma.order.aggregate({
-        where: { orgId, createdAt: { gte: startDate }, paymentStatus: 'paid' },
-        _sum: { netAmount: true, taxAmount: true },
-        _count: { _all: true },
-      });
+      const isDay = period === 'day';
+      const baseQueries = [
+        prisma.order.aggregate({
+          where: { orgId, createdAt: { gte: startDate }, paymentStatus: 'paid' },
+          _sum: { netAmount: true, taxAmount: true },
+          _count: { _all: true },
+        }),
+        prisma.expense.aggregate({
+          where: { orgId, expenseDate: { gte: startDate }, approvalStatus: 'approved' },
+          _sum: { amount: true },
+        }),
+        prisma.purchaseOrder.aggregate({
+          where: { orgId, createdAt: { gte: startDate } },
+          _sum: { totalCost: true },
+          _count: { _all: true },
+        }),
+        prisma.order.groupBy({
+          by: ['paymentStatus'],
+          where: { orgId, createdAt: { gte: startDate } },
+          _count: { _all: true },
+          _sum: { netAmount: true },
+        }),
+        prisma.order.groupBy({
+          by: ['channelSourceId'],
+          where: { orgId, createdAt: { gte: startDate }, paymentStatus: 'paid' },
+          _sum: { netAmount: true },
+          _count: { _all: true },
+        }),
+        prisma.expense.groupBy({
+          by: ['category'],
+          where: { orgId, expenseDate: { gte: startDate }, approvalStatus: 'approved' },
+          _sum: { amount: true },
+          _count: { _all: true },
+        }),
+        prisma.dailyReconciliation.count({ where: { orgId, status: 'pending' } }),
+        prisma.financialTransaction.groupBy({
+          by: ['type'],
+          where: { orgId, transactionDate: { gte: startDate } },
+          _sum: { netAmount: true, amount: true, taxAmount: true },
+        }),
+      ];
 
-      const previousRevenue = await prisma.order.aggregate({
-        where: { orgId, createdAt: { gte: previousStartDate, lt: previousEndDate }, paymentStatus: 'paid' },
-        _sum: { netAmount: true },
-      });
+      const extraQueries = isDay ? [] : [
+        prisma.order.aggregate({
+          where: { orgId, createdAt: { gte: previousStartDate, lt: previousEndDate }, paymentStatus: 'paid' },
+          _sum: { netAmount: true },
+        }),
+        prisma.expense.aggregate({
+          where: { orgId, expenseDate: { gte: previousStartDate, lt: previousEndDate }, approvalStatus: 'approved' },
+          _sum: { amount: true },
+        }),
+        prisma.financialTransaction.groupBy({
+          by: ['type'],
+          where: { orgId, transactionDate: { gte: previousStartDate, lt: previousEndDate } },
+          _sum: { netAmount: true },
+        }),
+        prisma.financialTransaction.groupBy({
+          by: ['category'],
+          where: { orgId, transactionDate: { gte: startDate }, type: 'expense' },
+          _sum: { netAmount: true },
+          _count: { _all: true },
+        }),
+      ];
 
-      const currentExpenses = await prisma.expense.aggregate({
-        where: { orgId, expenseDate: { gte: startDate }, approvalStatus: 'approved' },
-        _sum: { amount: true },
-      });
+      const [
+        currentRevenue, currentExpenses, purchaseOrderTotals, orderCounts, revenueByChannel,
+        expensesByCategory, pendingReconciliations, manualTxnsByType,
+        ...extra
+      ] = await Promise.all([...baseQueries, ...extraQueries]);
 
-      const previousExpenses = await prisma.expense.aggregate({
-        where: { orgId, expenseDate: { gte: previousStartDate, lt: previousEndDate }, approvalStatus: 'approved' },
-        _sum: { amount: true },
-      });
+      const previousRevenue = extra[0] || { _sum: { netAmount: 0 } };
+      const previousExpenses = extra[1] || { _sum: { amount: 0 } };
+      const previousManualTxnsByType = extra[2] || [];
+      const manualExpensesByCategory = extra[3] || [];
 
-      const purchaseOrderTotals = await prisma.purchaseOrder.aggregate({
-        where: { orgId, createdAt: { gte: startDate } },
-        _sum: { totalCost: true },
-        _count: { _all: true },
-      });
-
-      const orderCounts = await prisma.order.groupBy({
-        by: ['paymentStatus'],
-        where: { orgId, createdAt: { gte: startDate } },
-        _count: { _all: true },
-        _sum: { netAmount: true },
-      });
-
-      const todayRevenue = await prisma.order.aggregate({
-        where: { orgId, createdAt: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) }, paymentStatus: 'paid' },
-        _sum: { netAmount: true },
-        _count: { _all: true },
-      });
-
-      const revenueByChannel = await prisma.order.groupBy({
-        by: ['channelSourceId'],
-        where: { orgId, createdAt: { gte: startDate }, paymentStatus: 'paid' },
-        _sum: { netAmount: true },
-        _count: { _all: true },
-      });
-
-      const expensesByCategory = await prisma.expense.groupBy({
-        by: ['category'],
-        where: { orgId, expenseDate: { gte: startDate }, approvalStatus: 'approved' },
-        _sum: { amount: true },
-        _count: { _all: true },
-      });
-
-      const pendingReconciliations = await prisma.dailyReconciliation.count({
-        where: { orgId, status: 'pending' },
-      });
-
-      const recentTransactions = await prisma.financialTransaction.findMany({
-        where: { orgId },
-        orderBy: { transactionDate: 'desc' },
-        take: 10,
-      });
-
-      const salaryTotals = await prisma.employee.aggregate({
-        where: { orgId, status: 'active', salary: { not: null } },
-        _sum: { salary: true },
-        _count: { _all: true },
-      });
-
-      // Manual transactions queries
-      const manualTxnsByType = await prisma.financialTransaction.groupBy({
-        by: ['type'],
-        where: { orgId, transactionDate: { gte: startDate } },
-        _sum: { netAmount: true, amount: true, taxAmount: true },
-      });
-
-      const previousManualTxnsByType = await prisma.financialTransaction.groupBy({
-        by: ['type'],
-        where: { orgId, transactionDate: { gte: previousStartDate, lt: previousEndDate } },
-        _sum: { netAmount: true },
-      });
-
-      const manualExpensesByCategory = await prisma.financialTransaction.groupBy({
-        by: ['category'],
-        where: { orgId, transactionDate: { gte: startDate }, type: 'expense' },
-        _sum: { netAmount: true },
-        _count: { _all: true },
-      });
-      
-      const todayManualRevenue = await prisma.financialTransaction.aggregate({
-        where: { orgId, transactionDate: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) }, type: 'revenue' },
-        _sum: { netAmount: true },
-        _count: { _all: true },
-      });
-
-      // Get channel names
-      const channelIds = revenueByChannel.map((r: { channelSourceId: string }) => r.channelSourceId);
-      const channels = await prisma.channelSource.findMany({
+      const channelIds = (revenueByChannel as any[]).map((r: any) => r.channelSourceId).filter(Boolean);
+      const channels = channelIds.length ? await prisma.channelSource.findMany({
         where: { id: { in: channelIds } },
         select: { id: true, name: true },
-      });
-      const channelMap = new Map(channels.map((c: { id: string; name: string }) => [c.id, c.name]));
+      }) : [];
+      const channelMap = new Map(channels.map((c: any) => [c.id, c.name]));
 
       // Parse manual transaction data
       const manualRevenue = manualTxnsByType.find(t => t.type === 'revenue')?._sum?.netAmount ?? 0;

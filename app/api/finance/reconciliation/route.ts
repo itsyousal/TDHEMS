@@ -55,15 +55,15 @@ export async function GET(request: Request) {
       purchaseOrdersData,
       refundsData,
     ] = await Promise.all([
-      // All orders
+      // All orders for the organization
       prisma.order.findMany({
-        where: { createdAt: { gte: startOfDay, lt: endOfDay } },
+        where: { orgId, createdAt: { gte: startOfDay, lt: endOfDay } },
         include: { channelSource: { select: { id: true, name: true } } },
       }),
-      // Group by channel
+      // Group by channel for the organization
       prisma.order.groupBy({
         by: ['channelSourceId'],
-        where: { createdAt: { gte: startOfDay, lt: endOfDay }, paymentStatus: 'paid' },
+        where: { orgId, createdAt: { gte: startOfDay, lt: endOfDay }, paymentStatus: 'paid' },
         _sum: { netAmount: true, taxAmount: true },
         _count: true,
       }),
@@ -76,8 +76,8 @@ export async function GET(request: Request) {
         where: { orgId, receivedDate: { gte: startOfDay, lt: endOfDay }, status: 'received' },
         include: { supplier: { select: { id: true, name: true } } },
       }),
-      // Refunds
-      prisma.order.findMany({ where: { createdAt: { gte: startOfDay, lt: endOfDay }, paymentStatus: 'refunded' } }),
+      // Refunds for the organization
+      prisma.order.findMany({ where: { orgId, createdAt: { gte: startOfDay, lt: endOfDay }, paymentStatus: 'refunded' } }),
     ]);
 
     // Get channel names

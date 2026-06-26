@@ -37,53 +37,72 @@ export async function GET(req: NextRequest) {
     const yesterdayEnd = new Date(todayEnd);
     yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
 
-    // Get today's sales
-    const todayOrders = await prisma.order.findMany({
-      where: {
-        orgId: userOrg,
-        createdAt: {
-          gte: todayStart,
-          lte: todayEnd,
+    // Use aggregate queries instead of loading all order rows into memory.
+    const [todayAggregate, todayStatusCounts, yesterdayAggregate, yesterdayStatusCounts] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          orgId: userOrg,
+          createdAt: {
+            gte: todayStart,
+            lte: todayEnd,
+          },
+          status: {
+            not: 'cancelled',
+          },
         },
-        status: {
-          not: 'cancelled',
+        _sum: { netAmount: true },
+        _count: { _all: true },
+      }),
+      prisma.order.groupBy({
+        by: ['paymentStatus'],
+        where: {
+          orgId: userOrg,
+          createdAt: {
+            gte: todayStart,
+            lte: todayEnd,
+          },
+          status: {
+            not: 'cancelled',
+          },
         },
-      },
-      select: {
-        netAmount: true,
-        status: true,
-        paymentStatus: true,
-      },
-    });
+        _count: { _all: true },
+      }),
+      prisma.order.aggregate({
+        where: {
+          orgId: userOrg,
+          createdAt: {
+            gte: yesterdayStart,
+            lte: yesterdayEnd,
+          },
+          status: {
+            not: 'cancelled',
+          },
+        },
+        _sum: { netAmount: true },
+        _count: { _all: true },
+      }),
+      prisma.order.groupBy({
+        by: ['paymentStatus'],
+        where: {
+          orgId: userOrg,
+          createdAt: {
+            gte: yesterdayStart,
+            lte: yesterdayEnd,
+          },
+          status: {
+            not: 'cancelled',
+          },
+        },
+        _count: { _all: true },
+      }),
+    ]);
 
-    // Get yesterday's sales
-    const yesterdayOrders = await prisma.order.findMany({
-      where: {
-        orgId: userOrg,
-        createdAt: {
-          gte: yesterdayStart,
-          lte: yesterdayEnd,
-        },
-        status: {
-          not: 'cancelled',
-        },
-      },
-      select: {
-        netAmount: true,
-        status: true,
-        paymentStatus: true,
-      },
-    });
-
-    // Calculate totals
-    const todayTotal = todayOrders.reduce((sum: number, order: { netAmount: number }) => sum + order.netAmount, 0);
-    const yesterdayTotal = yesterdayOrders.reduce((sum: number, order: { netAmount: number }) => sum + order.netAmount, 0);
-    
-    const todayPaid = todayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'paid').length;
-    const todayPending = todayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'pending').length;
-
-    const yesterdayPaid = yesterdayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'paid').length;
-    const yesterdayPending = yesterdayOrders.filter((o: { paymentStatus: string }) => o.paymentStatus === 'pending').length;
+    const todayTotal = todayAggregate._sum?.netAmount ?? 0;
+    const yesterdayTotal = yesterdayAggregate._sum?.netAmount ?? 0;
+    const todayPaid = todayStatusCounts.find((item) => item.paymentStatus === 'paid')?._count?._all ?? 0;
+    const todayPending = todayStatusCounts.find((item) => item.paymentStatus === 'pending')?._count?._all ?? 0;
+    const yesterdayPaid = yesterdayStatusCounts.find((item) => item.paymentStatus === 'paid')?._count?._all ?? 0;
+    const yesterdayPending = yesterdayStatusCounts.find((item) => item.paymentStatus === 'pending')?._count?._all ?? 0;
 
     // Calculate change percentage
     const changePercentage = yesterdayTotal > 0
@@ -93,13 +112,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       today: {
         total: todayTotal,
-        orders: todayOrders.length,
+        orders: todayAggregate._count?._all ?? 0,
         paid: todayPaid,
         pending: todayPending,
       },
       yesterday: {
         total: yesterdayTotal,
-        orders: yesterdayOrders.length,
+        orders: yesterdayAggregate._count?._all ?? 0,
         paid: yesterdayPaid,
         pending: yesterdayPending,
       },

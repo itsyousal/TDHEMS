@@ -57,13 +57,17 @@ async function FinancePage() {
   // Server-side fetch initial dashboard data so the client renders immediately
   const today = new Date().toISOString().slice(0, 10);
   const base = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
-  const statsRes = await fetch(new URL(`/api/finance/stats?period=day`, base).toString());
-  const txRes = await fetch(new URL(`/api/finance/transactions?limit=10`, base).toString());
-  const reconRes = await fetch(new URL(`/api/finance/reconciliation?date=${today}`, base).toString());
+  const [statsRes, txRes, reconRes] = await Promise.all([
+    fetch(new URL(`/api/finance/stats?period=day`, base).toString()),
+    fetch(new URL(`/api/finance/transactions?limit=10`, base).toString()),
+    fetch(new URL(`/api/finance/reconciliation?date=${today}`, base).toString()),
+  ]);
 
-  const initialStats = statsRes.ok ? await statsRes.json().catch(() => null) : null;
-  const initialTx = txRes.ok ? await txRes.json().catch(() => null) : null;
-  const initialRecon = reconRes.ok ? await reconRes.json().catch(() => null) : null;
+  const [initialStats, initialTx, initialRecon] = await Promise.all([
+    statsRes.ok ? statsRes.json().catch(() => null) : null,
+    txRes.ok ? txRes.json().catch(() => null) : null,
+    reconRes.ok ? reconRes.json().catch(() => null) : null,
+  ]);
 
   // Check if user has at least view permission
   if (!permissions.canView) {
@@ -97,7 +101,7 @@ async function FinancePage() {
           expensesByCategory: initialStats.expensesByCategory || [],
           comparison: initialStats.trends || { revenueChange: 0, expenseChange: 0, profitChange: 0 },
         } : null}
-        initialTransactions={initialTx?.data || []}
+        initialTransactions={initialTx?.data ?? null}
         initialReconciliation={initialRecon || null}
         isSuperAdmin={isSuperAdmin}
       />
