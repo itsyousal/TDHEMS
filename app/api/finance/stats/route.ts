@@ -143,7 +143,50 @@ export async function GET(request: Request) {
         }),
       ];
 
-      const [
+      const recentTransactions = await prisma.financialTransaction.findMany({
+  where: { 
+    orgId,
+    transactionDate: { 
+      gte: startDate 
+    } 
+  },
+  orderBy: { 
+    transactionDate: 'desc' 
+  },
+  take: 10
+});
+
+const salaryTotals = await prisma.employeeSalary.aggregate({
+  where: { orgId, isActive: true },
+  _sum: { salary: true },
+  _count: { _all: true }
+});
+
+const todayRevenue = await prisma.order.aggregate({
+  where: { 
+    orgId, 
+    createdAt: { 
+      gte: new Date(new Date().setHours(0,0,0,0)) 
+    },
+    paymentStatus: 'paid'
+  },
+  _sum: { netAmount: true },
+  _count: { _all: true }
+});
+
+const todayManualRevenue = await prisma.financialTransaction.aggregate({
+  where: { 
+    orgId,
+    type: 'revenue',
+    transactionDate: { 
+      gte: new Date(new Date().setHours(0,0,0,0)) 
+    }
+  },
+  _sum: { netAmount: true },
+  _count: { _all: true }
+});
+
+const [
         currentRevenue, currentExpenses, purchaseOrderTotals, orderCounts, revenueByChannel,
         expensesByCategory, pendingReconciliations, manualTxnsByType,
         ...extra
@@ -253,7 +296,7 @@ export async function GET(request: Request) {
         today: {
           revenue: (todayRevenue._sum?.netAmount ?? 0) + (todayManualRevenue._sum?.netAmount ?? 0),
           orderCount: (todayRevenue._count?._all ?? 0) + (todayManualRevenue._count?._all ?? 0),
-        },
+         },
 
         // Breakdowns
         revenueByChannel: channelRevenue,
