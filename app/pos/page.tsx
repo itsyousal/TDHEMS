@@ -362,7 +362,7 @@ export default function PointOfSalePage() {
                   <div>
                     <p className="text-[0.65rem] uppercase tracking-[0.3em] text-slate-400">Subtotal</p>
                     <p className="text-lg font-semibold text-slate-900">
-                      {formatCurrency(selectedOrder.totalAmount - selectedOrder.taxAmount + selectedOrder.discountAmount)}
+                      {formatCurrency(selectedOrder.totalAmount)}
                     </p>
                   </div>
                   <div>
@@ -531,7 +531,7 @@ export default function PointOfSalePage() {
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>
-                  {formatCurrency(selectedOrder.totalAmount - selectedOrder.taxAmount + selectedOrder.discountAmount)}
+                  {formatCurrency(selectedOrder.totalAmount)}
                 </span>
               </div>
               <div className="flex justify-between">

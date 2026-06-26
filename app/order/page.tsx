@@ -423,7 +423,7 @@ function OrderSuccessView({
       </div>
       
       {/* Action button */}
-      <Button onClick={onNewOrder} className="w-full mt-6 h-12 gap-2 bg-gray-900 hover:bg-gray-800">
+      <Button onClick={onNewOrder} className="w-full mt-6 h-12 gap-2 bg-gray-900 hover:bg-gray-800 text-white">
         <Plus className="w-4 h-4" />
         Place Another Order
       </Button>
