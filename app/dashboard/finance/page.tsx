@@ -64,3 +64,5 @@ function FinanceSkeleton() {
     </div>
   );
 }
+
+export default FinancePage;
