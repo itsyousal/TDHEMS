@@ -117,8 +117,9 @@ export async function GET(request: Request) {
         }),
         prisma.dailyReconciliation.count({ where: { orgId, status: 'pending' } }),
         prisma.financialTransaction.groupBy({
-          by: ['type'],
-          where: { orgId, transactionDate: { gte: startDate } },
+            by: ['type'],
+            // Exclude transactions that are linked to orders (these are counted in orders aggregates)
+            where: { orgId, transactionDate: { gte: startDate }, NOT: { referenceType: 'order' } },
           _sum: { netAmount: true, amount: true, taxAmount: true },
         }),
       ];
@@ -134,12 +135,14 @@ export async function GET(request: Request) {
         }),
         prisma.financialTransaction.groupBy({
           by: ['type'],
-          where: { orgId, transactionDate: { gte: previousStartDate, lt: previousEndDate } },
+          // Exclude order-linked transactions from previous period manual totals as well
+          where: { orgId, transactionDate: { gte: previousStartDate, lt: previousEndDate }, NOT: { referenceType: 'order' } },
           _sum: { netAmount: true },
         }),
         prisma.financialTransaction.groupBy({
           by: ['category'],
-          where: { orgId, transactionDate: { gte: startDate }, type: 'expense' },
+          // Exclude order-linked transactions from manual expense category breakdown
+          where: { orgId, transactionDate: { gte: startDate }, type: 'expense', NOT: { referenceType: 'order' } },
           _sum: { netAmount: true },
           _count: { _all: true },
         }),
@@ -190,9 +193,9 @@ const todayManualRevenue = await prisma.financialTransaction.aggregate({
   where: { 
     orgId,
     type: 'revenue',
-    transactionDate: { 
-      gte: new Date(new Date().setHours(0,0,0,0)) 
-    }
+          // Exclude order-linked transactions recorded as financial transactions
+          transactionDate: { gte: new Date(new Date().setHours(0,0,0,0)) },
+          NOT: { referenceType: 'order' },
   },
   _sum: { netAmount: true },
   _count: { _all: true }
