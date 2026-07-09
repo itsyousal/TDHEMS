@@ -44,22 +44,16 @@ async function FinancePage() {
         </p>
       </div>
 
-      <FinanceDashboard
-        permissions={permissions}
-        initialStats={null}
-        initialTransactions={[]}
-        initialReconciliation={null}
-        isSuperAdmin={isSuperAdmin}
-      />
+      <Suspense fallback={<FinanceSkeleton />}>
+        <FinanceDashboard
+          permissions={permissions}
+          initialStats={null}
+          initialTransactions={[]}
+          initialReconciliation={null}
+          isSuperAdmin={isSuperAdmin}
+        />
+      </Suspense>
     </>
-  );
-}
-
-export default function FinancePageWrapper() {
-  return (
-    <Suspense fallback={<FinanceSkeleton />}>
-      <FinancePage />
-    </Suspense>
   );
 }
 

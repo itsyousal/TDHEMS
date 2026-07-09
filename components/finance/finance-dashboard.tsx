@@ -149,7 +149,7 @@ export default function FinanceDashboard({ permissions, initialStats = null, ini
   const [stats, setStats] = useState<FinanceStats | null>(initialStats);
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions || []);
   const [reconciliation, setReconciliation] = useState<DailyReconciliation | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isReconciling, setIsReconciling] = useState(false);
   const [showReconciliationModal, setShowReconciliationModal] = useState(false);
   const [reconciliationNotes, setReconciliationNotes] = useState('');
@@ -301,17 +301,15 @@ export default function FinanceDashboard({ permissions, initialStats = null, ini
     if (!permissions.canView) return;
     const needFetch = (!initialTransactions || initialTransactions.length === 0) && !initialStats;
     if (needFetch) {
-      fetchDashboardData();
+      fetchDashboardData({ silent: true });
       return;
     }
 
     if (initialReconciliation) {
       setReconciliation(initialReconciliation);
-      setIsLoading(false);
       return;
     }
 
-    setIsLoading(false);
     fetchReconciliation();
   }, [permissions.canView, fetchDashboardData, fetchReconciliation, initialTransactions, initialStats, initialReconciliation]);
 
@@ -463,17 +461,34 @@ export default function FinanceDashboard({ permissions, initialStats = null, ini
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const showSkeleton = !stats && transactions.length === 0 && !reconciliation;
+  const renderAmount = (value: number | undefined) => {
+    return value === undefined || value === null ? <span className="text-muted-foreground">Loading...</span> : formatCurrency(value);
+  };
+  const renderNumber = (value: number | undefined) => {
+    return value === undefined || value === null ? <span className="text-muted-foreground">Loading...</span> : value;
+  };
 
   function loadData(event?: React.MouseEvent<HTMLButtonElement>): void {
     // Refresh dashboard data when user clicks Refresh
     fetchDashboardData();
+  }
+
+  if (showSkeleton) {
+    return (
+      <div className="space-y-6">
+        <div className="h-64 rounded-xl bg-slate-100 animate-pulse" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, idx) => (
+            <div key={idx} className="h-40 rounded-xl bg-slate-100 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="h-80 rounded-xl bg-slate-100 animate-pulse" />
+          <div className="h-80 rounded-xl bg-slate-100 animate-pulse" />
+        </div>
+      </div>
+    );
   }
 
   return (
