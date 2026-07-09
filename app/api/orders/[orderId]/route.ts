@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAuthSession } from '@/lib/auth';
+import { cacheDelPrefix } from '@/lib/cache';
 
 export async function PATCH(
   request: Request,
@@ -180,6 +181,9 @@ export async function PATCH(
         });
       }
     }
+
+    // Invalidate finance caches for this org asynchronously
+    cacheDelPrefix(`finance:${orgId}:`).catch((err) => console.warn('cacheDelPrefix failed', err));
 
     return NextResponse.json(updatedOrder);
   } catch (error) {

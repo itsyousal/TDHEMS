@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
+import { cacheDelPrefix } from '@/lib/cache';
 
 /**
  * GET /api/purchase-orders
@@ -303,13 +304,10 @@ export async function POST(request: Request) {
 
       // Auto-record financial transaction for this purchase
       const txnDateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-      const txnCount = await tx.financialTransaction.count({
-        where: {
-          orgId,
-          transactionNumber: { startsWith: `TXN-${txnDateStr}` },
-        },
-      });
-      const transactionNumber = `TXN-${txnDateStr}-${String(txnCount + 1).padStart(5, '0')}`;
+      // Use time+random suffix to avoid table-wide count scans
+      const timeSuffix = String(Date.now()).slice(-8);
+      const rand = Math.floor(Math.random() * 900 + 100);
+      const transactionNumber = `TXN-${txnDateStr}-${timeSuffix}-${rand}`;
 
       await tx.financialTransaction.create({
         data: {
@@ -345,6 +343,9 @@ export async function POST(request: Request) {
         status: 'success',
       },
     });
+
+    // Invalidate finance caches for this org asynchronously
+    cacheDelPrefix(`finance:${orgId}:`).catch((err) => console.warn('cacheDelPrefix failed', err));
 
     return NextResponse.json({
       purchaseOrder: result,

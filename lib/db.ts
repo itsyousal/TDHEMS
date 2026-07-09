@@ -16,14 +16,41 @@ if (process.env.NODE_ENV === 'production' && connectionString && !connectionStri
   );
 }
 
+const enablePrismaQueryLogging = process.env.ENABLE_PRISMA_SLOW_QUERY_LOGGING === 'true';
+const slowQueryThresholdMs = parseInt(process.env.PRISMA_SLOW_QUERY_MS || '200', 10);
+
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    // Using transaction pooler is recommended, but explicit connection limits
-    // can be set via connection parameters or datasource overrides if needed.
-    // For now, we rely on the recommended Supabase setup.
+    log: enablePrismaQueryLogging
+      ? ['query', 'info', 'warn', 'error']
+      : process.env.NODE_ENV === 'development'
+      ? ['query', 'error', 'warn']
+      : ['error'],
   });
+
+// If enabled, register a slow-query listener that highlights queries above threshold
+if (enablePrismaQueryLogging) {
+  // Prisma emits 'query' events with { query, params, duration } in ms
+  // Use a non-throwing handler to avoid impacting runtime.
+  try {
+    // @ts-ignore - runtime event typing
+    prisma.$on('query', (e: any) => {
+      try {
+        const dur = typeof e.duration === 'number' ? e.duration : undefined;
+        if (dur !== undefined && dur >= slowQueryThresholdMs) {
+          // Log slow query with trimmed params to avoid leaking large payloads
+          const safeParams = typeof e.params === 'string' && e.params.length > 200 ? e.params.slice(0, 200) + '...' : e.params;
+          console.warn(`[PRISMA][SLOW_QUERY] ${dur}ms — ${e.query} — params=${safeParams}`);
+        }
+      } catch (inner) {
+        console.warn('Error in Prisma slow-query logger', inner);
+      }
+    });
+  } catch (err) {
+    console.warn('Prisma slow-query logging setup failed', err);
+  }
+}
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 

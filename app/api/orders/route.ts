@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 import { getAuthSession } from '@/lib/auth';
+import { cacheDelPrefix } from '@/lib/cache';
 
 // Tax should be provided by client as an absolute amount (taxAmount). Avoid using hardcoded constants here.
 
@@ -127,6 +128,8 @@ async function findOrCreateCustomer(
 
 export async function POST(request: Request) {
   try {
+    const reqStart = Date.now();
+    console.log(`[ORDERS_CREATE] start`);
     const session = await getAuthSession();
     if (!session?.user?.organizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -237,7 +240,7 @@ export async function POST(request: Request) {
         const now = Date.now();
         const rand = Math.floor(Math.random() * 900 + 100); // 3-digit random
         const orderNumber = `ORD-${now}-${rand}`;
-
+        const txStart = Date.now();
         order = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           const createdOrder = await tx.order.create({
             data: {
@@ -332,8 +335,14 @@ export async function POST(request: Request) {
             throw new Error('Failed to create financial transaction for order');
           }
 
+
           return createdOrder;
         });
+        const txEnd = Date.now();
+        console.log(`[ORDERS_CREATE] prisma.transaction completed in ${txEnd - txStart}ms`);
+
+        // Invalidate finance caches for this org asynchronously so dashboards refresh quickly
+        cacheDelPrefix(`finance:${orgId}:`).catch((err) => console.warn('cacheDelPrefix failed', err));
 
         // success
         break;
@@ -352,6 +361,8 @@ export async function POST(request: Request) {
     if (!order && lastError) {
       throw lastError;
     }
+    const reqEnd = Date.now();
+    console.log(`[ORDERS_CREATE] finished total=${reqEnd - reqStart}ms`);
 
     return NextResponse.json(order, { status: 201 });
   } catch (error) {

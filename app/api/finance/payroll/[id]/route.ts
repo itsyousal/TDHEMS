@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAuthSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
+import { cacheDelPrefix } from '@/lib/cache';
 
 /**
  * PATCH /api/finance/payroll/[id]
@@ -90,13 +91,10 @@ export async function PATCH(
     if (status === 'paid' && payroll.status !== 'paid') {
       const today = new Date();
       const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-      const count = await prisma.financialTransaction.count({
-        where: {
-          orgId,
-          transactionNumber: { startsWith: `TXN-${dateStr}` },
-        },
-      });
-      const transactionNumber = `TXN-${dateStr}-${String(count + 1).padStart(5, '0')}`;
+      // Use time+random suffix to avoid table-wide count scans
+      const timeSuffix = String(Date.now()).slice(-8);
+      const rand = Math.floor(Math.random() * 900 + 100);
+      const transactionNumber = `TXN-${dateStr}-${timeSuffix}-${rand}`;
 
       await prisma.financialTransaction.create({
         data: {
@@ -120,6 +118,9 @@ export async function PATCH(
           approvedAt: new Date(),
         },
       });
+
+      // Invalidate finance caches for this org asynchronously
+      cacheDelPrefix(`finance:${orgId}:`).catch((err) => console.warn('cacheDelPrefix failed', err));
     }
 
     // Log audit

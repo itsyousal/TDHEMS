@@ -12,6 +12,8 @@ import { cacheGet, cacheSet, cacheDelPrefix } from '@/lib/cache';
  */
 export async function GET(request: Request) {
   try {
+  const reqStart = Date.now();
+  console.log(`[FINANCE_STATS] start url=${request.url}`);
       const session = await getAuthSession();
       if (!session?.user?.id || !session?.user?.organizationId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -156,11 +158,21 @@ export async function GET(request: Request) {
   take: 10
 });
 
-const salaryTotals = await prisma.employeeSalary.aggregate({
-  where: { orgId, isActive: true },
-  _sum: { salary: true },
-  _count: { _all: true }
-});
+// employeeSalary may not exist in all schemas (some deployments). Guard here.
+let salaryTotals: any = { _sum: { salary: 0 }, _count: { _all: 0 } };
+if ((prisma as any).employeeSalary && typeof (prisma as any).employeeSalary.aggregate === 'function') {
+  try {
+    salaryTotals = await (prisma as any).employeeSalary.aggregate({
+      where: { orgId, isActive: true },
+      _sum: { salary: true },
+      _count: { _all: true }
+    });
+  } catch (err) {
+    console.warn('[FINANCE_STATS] salaryTotals aggregate failed', err);
+  }
+} else {
+  console.log('[FINANCE_STATS] employeeSalary model not present; skipping salary totals');
+}
 
 const todayRevenue = await prisma.order.aggregate({
   where: { 
@@ -186,11 +198,40 @@ const todayManualRevenue = await prisma.financialTransaction.aggregate({
   _count: { _all: true }
 });
 
-const [
+      const settled = await Promise.allSettled([...baseQueries, ...extraQueries]);
+
+      // sensible defaults for each query in the same order as baseQueries + extraQueries
+      const defaults: any[] = [
+        { _sum: { netAmount: 0, taxAmount: 0 }, _count: { _all: 0 } }, // order.aggregate
+        { _sum: { amount: 0 } }, // expense.aggregate
+        { _sum: { totalCost: 0 }, _count: { _all: 0 } }, // purchaseOrder.aggregate
+        [], // order.groupBy(paymentStatus)
+        [], // order.groupBy(channel)
+        [], // expense.groupBy(category)
+        0, // dailyReconciliation.count
+        [], // financialTransaction.groupBy(type)
+      ];
+      if (!isDay) {
+        defaults.push({ _sum: { netAmount: 0 } }); // previous order agg
+        defaults.push({ _sum: { amount: 0 } }); // previous expense agg
+        defaults.push([]); // previous manual Txns by type
+        defaults.push([]); // manualExpensesByCategory
+      }
+
+      const allValues = settled.map((s, idx) => {
+        if (s.status === 'fulfilled') return s.value;
+        console.error('[FINANCE_STATS] query failed index=', idx, s.reason);
+        return defaults[idx];
+      });
+
+      const [
         currentRevenue, currentExpenses, purchaseOrderTotals, orderCounts, revenueByChannel,
         expensesByCategory, pendingReconciliations, manualTxnsByType,
         ...extra
-      ] = await Promise.all([...baseQueries, ...extraQueries]);
+      ] = allValues;
+
+      const afterDb = Date.now();
+      console.log(`[FINANCE_STATS] dbQueries completed in ${afterDb - reqStart}ms`);
 
       const previousRevenue = extra[0] || { _sum: { netAmount: 0 } };
       const previousExpenses = extra[1] || { _sum: { amount: 0 } };
@@ -326,6 +367,8 @@ const [
       };
 
       cacheSet(cacheKey, payload, 30 * 1000);
+      const reqEnd = Date.now();
+      console.log(`[FINANCE_STATS] finished url=${request.url} total=${reqEnd - reqStart}ms`);
       return NextResponse.json(payload);
   } catch (error) {
     console.error('[FINANCE_STATS_GET]', error);
