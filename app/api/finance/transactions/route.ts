@@ -36,6 +36,7 @@ export async function GET(request: Request) {
       }
 
       const url = new URL(request.url);
+      const lite = url.searchParams.get('lite') === 'true';
       const page = parseInt(url.searchParams.get('page') || '1');
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
       const type = url.searchParams.get('type'); // revenue, expense, refund, adjustment
@@ -75,36 +76,37 @@ export async function GET(request: Request) {
         ];
       }
 
-      const [transactions, total] = await Promise.all([
-        prisma.financialTransaction.findMany({
-          where,
-          orderBy: { transactionDate: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-        }),
-        prisma.financialTransaction.count({ where }),
-      ]);
-
-      // Calculate summary for filtered results
-      const summary = await prisma.financialTransaction.aggregate({
+      const transactions = await prisma.financialTransaction.findMany({
         where,
-        _sum: { amount: true, netAmount: true, taxAmount: true },
+        orderBy: { transactionDate: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
       });
 
-      const payload = {
-        data: transactions,
-        meta: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-        summary: {
-          totalAmount: summary._sum?.amount ?? 0,
-          totalNetAmount: summary._sum?.netAmount ?? 0,
-          totalTax: summary._sum?.taxAmount ?? 0,
-        },
-      };
+      let payload: any = { data: transactions };
+
+      if (!lite) {
+        const total = await prisma.financialTransaction.count({ where });
+        const summary = await prisma.financialTransaction.aggregate({
+          where,
+          _sum: { amount: true, netAmount: true, taxAmount: true },
+        });
+
+        payload = {
+          data: transactions,
+          meta: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+          summary: {
+            totalAmount: summary._sum?.amount ?? 0,
+            totalNetAmount: summary._sum?.netAmount ?? 0,
+            totalTax: summary._sum?.taxAmount ?? 0,
+          },
+        };
+      }
 
       await cacheSet(cacheKey, payload, 30 * 1000);
       return NextResponse.json(payload);

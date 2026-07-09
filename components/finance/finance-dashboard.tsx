@@ -175,7 +175,7 @@ export default function FinanceDashboard({ permissions, initialStats = null, ini
       if (!opts?.silent) setIsLoading(true);
       const apiPeriod = (opts?.period ?? selectedPeriod) === 'today' ? 'day' : (opts?.period ?? selectedPeriod);
 
-      const txParams = new URLSearchParams({ limit: '10' });
+      const txParams = new URLSearchParams({ limit: '10', lite: 'true' });
       if ((opts?.txnFilter ?? transactionFilter) !== 'all') txParams.set('type', opts?.txnFilter ?? transactionFilter);
 
       const statsPromise = fetch(`/api/finance/stats?period=${apiPeriod}`);
@@ -258,18 +258,62 @@ export default function FinanceDashboard({ permissions, initialStats = null, ini
     }
   }, [selectedPeriod, transactionFilter]);
 
-  // Only fetch on mount if we don't have initial transactions/stats
+  const fetchReconciliation = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await fetch(`/api/finance/reconciliation?date=${today}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown' }));
+        console.error('Finance reconciliation API error', res.status, err);
+        return;
+      }
+      const rd = await res.json();
+      const channelData = rd.revenueByChannel || {};
+      const revenueByChannelArray = Object.entries(channelData).map(([channelId, info]: [string, any]) => ({
+        channel: channelId,
+        channelName: info.name || 'Direct',
+        amount: info.amount || 0,
+        orderCount: info.orderCount || 0,
+      }));
+
+      const mappedReconciliation: DailyReconciliation = {
+        id: rd.id,
+        reconciliationDate: rd.date || rd.reconciliationDate,
+        totalRevenue: rd.totalRevenue || 0,
+        totalExpenses: rd.totalExpenses || 0,
+        totalTax: rd.taxCollected || rd.netTax || 0,
+        netIncome: rd.netProfit || 0,
+        revenueByChannel: revenueByChannelArray,
+        orderCount: rd.totalOrders || 0,
+        averageOrderValue: rd.totalOrders > 0 ? (rd.totalRevenue || 0) / rd.totalOrders : 0,
+        status: rd.status || 'pending',
+        confirmedBy: rd.confirmedBy,
+        confirmedAt: rd.confirmedAt,
+      };
+      setReconciliation(mappedReconciliation);
+    } catch (error) {
+      console.error('Error fetching reconciliation data:', error);
+    }
+  }, []);
+
+  // Only fetch on mount if we don't have initial transactions/stats or reconciliation
   useEffect(() => {
     if (!permissions.canView) return;
     const needFetch = (!initialTransactions || initialTransactions.length === 0) && !initialStats;
-    if (needFetch) fetchDashboardData();
-    else {
-      // populate reconciliation from initial prop if provided
-      if (initialReconciliation) setReconciliation(initialReconciliation);
-      // ensure loading flag is off
-      setIsLoading(false);
+    if (needFetch) {
+      fetchDashboardData();
+      return;
     }
-  }, [permissions.canView, fetchDashboardData, initialTransactions, initialStats, initialReconciliation]);
+
+    if (initialReconciliation) {
+      setReconciliation(initialReconciliation);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(false);
+    fetchReconciliation();
+  }, [permissions.canView, fetchDashboardData, fetchReconciliation, initialTransactions, initialStats, initialReconciliation]);
 
   const handleConfirmReconciliation = async () => {
     if (!permissions.canReconcile) {
