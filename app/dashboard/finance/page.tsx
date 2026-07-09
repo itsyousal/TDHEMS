@@ -2,51 +2,27 @@ import React, { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '@/lib/auth';
 import FinanceDashboard from '@/components/finance/finance-dashboard';
-import { getUserRoles } from '@/lib/rbac';
 import { AccessDenied } from '@/components/access-denied';
 import { RefreshCw } from 'lucide-react';
 
 async function FinancePage() {
   const session = await getAuthSession();
-  
+
   if (!session?.user?.id || !session?.user?.organizationId) {
     redirect('/auth/login');
   }
-  
-  // Extract primitive string values
-  const userId = `${session.user.id}`;
-  const orgId = `${session.user.organizationId}`;
 
-  const roles = await getUserRoles(userId, orgId);
   const permissions = {
-    canView: roles.some((ur: any) =>
-      ur.role?.rolePermissions?.some((rp: any) => rp.permission?.slug === 'finance.view')
-    ),
-    canEdit: roles.some((ur: any) =>
-      ur.role?.rolePermissions?.some((rp: any) => rp.permission?.slug === 'finance.edit')
-    ),
-    canReconcile: roles.some((ur: any) =>
-      ur.role?.rolePermissions?.some((rp: any) => rp.permission?.slug === 'finance.reconcile')
-    ),
-    canManage: roles.some((ur: any) =>
-      ur.role?.rolePermissions?.some((rp: any) => rp.permission?.slug === 'finance.manage')
-    ),
+    canView: (session.user.permissions || []).includes('finance.view'),
+    canEdit: (session.user.permissions || []).includes('finance.edit'),
+    canReconcile: (session.user.permissions || []).includes('finance.reconcile'),
+    canManage: (session.user.permissions || []).includes('finance.manage'),
   };
 
-  // Determine if user is superadmin (role slug: owner-super-admin)
-  const isSuperAdmin = roles.some((ur: any) => ur.role?.slug === 'owner-super-admin');
+  const isSuperAdmin = (session.user.roles || []).includes('owner-super-admin');
 
-  // Server-side fetch initial dashboard data so the client renders immediately
-  const base = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
-  const [statsRes, txRes] = await Promise.all([
-    fetch(new URL(`/api/finance/stats?period=day`, base).toString()),
-    fetch(new URL(`/api/finance/transactions?limit=10&lite=true`, base).toString()),
-  ]);
-
-  const [initialStats, initialTx] = await Promise.all([
-    statsRes.ok ? statsRes.json().catch(() => null) : null,
-    txRes.ok ? txRes.json().catch(() => null) : null,
-  ]);
+  const initialStats = null;
+  const initialTx = null;
 
   // Check if user has at least view permission
   if (!permissions.canView) {
@@ -70,17 +46,8 @@ async function FinancePage() {
 
       <FinanceDashboard
         permissions={permissions}
-        initialStats={initialStats?.summary ? {
-          totalRevenue: initialStats.summary.totalRevenue || 0,
-          totalExpenses: initialStats.summary.totalExpenses || 0,
-          netProfit: initialStats.summary.netProfit || 0,
-          pendingInvoices: initialStats.counts?.pendingReconciliations || 0,
-          overdueInvoices: 0,
-          revenueByChannel: initialStats.revenueByChannel || [],
-          expensesByCategory: initialStats.expensesByCategory || [],
-          comparison: initialStats.trends || { revenueChange: 0, expenseChange: 0, profitChange: 0 },
-        } : null}
-        initialTransactions={initialTx?.data ?? []}
+        initialStats={null}
+        initialTransactions={[]}
         initialReconciliation={null}
         isSuperAdmin={isSuperAdmin}
       />
